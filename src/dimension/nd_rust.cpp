@@ -17,6 +17,7 @@
 #include "statusbar.h"
 #include "dimension.hpp"
 #include "nd_rust.hpp"
+#include "automation.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -116,7 +117,18 @@ NDRustBoard::NDRustBoard(int slot) :
     ledState(-1),
     ledTicks(0),
     lastInstructions(0),
-    lastHostTime(0)
+    lastHostTime(0),
+    snapDir(getenv("PREVIOUS_ND_SNAPSHOT")),
+    snapInterval(0),
+    snapNext(0),
+    snapCount(0),
+    statsInterval(0),
+    statsNext(0),
+    statsInstructions(0),
+    statsHostReads(0),
+    statsHostWrites(0),
+    statsVramRead(0),
+    statsVramWritten(0)
 {
     uint32_t w, h, pitch;
 
@@ -128,6 +140,17 @@ NDRustBoard::NDRustBoard(int slot) :
     }
     sdl.geometry(w, h, pitch);
     sdl.init();
+    if (snapDir) {
+        const char* s = getenv("PREVIOUS_ND_SNAPSHOT_INTERVAL");
+        double secs = s ? atof(s) : 10.0;
+        snapInterval = (uint64_t)(secs * ConfigureParams.System.nCpuFreq * 1000000.0);
+        snapNext = snapInterval;
+    }
+    const char* stats_secs = getenv("PREVIOUS_ND_STATS");
+    if (stats_secs) {
+        statsInterval = (uint64_t)(atof(stats_secs) * ConfigureParams.System.nCpuFreq * 1000000.0);
+        statsNext = statsInterval;
+    }
     const char* trace = getenv("PREVIOUS_ND_TRACE");
     if (trace && !nd_trace) {
         nd_trace = fopen(trace, "w");
@@ -140,9 +163,20 @@ NDRustBoard::~NDRustBoard() {
     nd_destroy(board);
 }
 
+/* Board space reaches the board at 0xF and the low 28 bits: VRAM is
+ * 0xFE000000 up (16 MB at most). */
+static bool nd_host_vram(int space, uint32_t addr) {
+    return space == ND_BOARD_SPACE && (addr & 0x0F000000) == 0x0E000000;
+}
+
 /* Host accesses: a board bus error is the m68k's bus error */
 uint32_t NDRustBoard::read(int space, uint32_t addr, int size) {
     uint32_t val = 0;
+
+    if (statsInterval) {
+        statsHostReads++;
+        if (nd_host_vram(space, addr)) statsVramRead += size;
+    }
 
     if (!board || nd_host_read(board, space, addr, size, &val) == ND_BUS_ERROR) {
         M68000_BusError(addr, BUS_ERROR_READ, size, BUS_ERROR_ACCESS_DATA, 0);
@@ -152,6 +186,10 @@ uint32_t NDRustBoard::read(int space, uint32_t addr, int size) {
 }
 
 void NDRustBoard::write(int space, uint32_t addr, int size, uint32_t val) {
+    if (statsInterval) {
+        statsHostWrites++;
+        if (nd_host_vram(space, addr)) statsVramWritten += size;
+    }
     nd_trace_access(slot, space, true, addr, size, val);
     if (!board || nd_host_write(board, space, addr, size, val) == ND_BUS_ERROR) {
         M68000_BusError(addr, BUS_ERROR_WRITE, size, BUS_ERROR_ACCESS_DATA, val);
@@ -183,9 +221,66 @@ void NDRustBoard::pause(bool pause) {
     nd_pause(board, pause);
 }
 
+/* Write what the ND window shows, VRAM as Previous blits it, to
+ * PREVIOUS_ND_SNAPSHOT/nd-NNN.ppm. */
+void NDRustBoard::snapshot(void) {
+    uint32_t w, h, pitch;
+    char path[FILENAME_MAX];
+    const uint8_t* vram = (const uint8_t*)nd_vram(board);
+
+    nd_display_geometry(board, &w, &h, &pitch);
+    snprintf(path, sizeof(path), "%s/nd-%03d.ppm", snapDir, snapCount++);
+    FILE* f = fopen(path, "wb");
+    if (!f) {
+        Log_Printf(LOG_WARN, "[ND] Slot %i: cannot write %s", slot, path);
+        return;
+    }
+    fprintf(f, "P6\n%u %u\n255\n", w, h);
+    uint8_t* line = (uint8_t*)malloc(w * 3);
+    for (uint32_t y = 0; y < h; y++) {
+        const uint8_t* src = vram + (size_t)y * pitch * 4; /* bytes B, G, R, A */
+        for (uint32_t x = 0; x < w; x++) {
+            line[3 * x + 0] = src[4 * x + 2];
+            line[3 * x + 1] = src[4 * x + 1];
+            line[3 * x + 2] = src[4 * x + 0];
+        }
+        fwrite(line, 3, w, f);
+    }
+    free(line);
+    fclose(f);
+}
+
+/* Log who did the work since the last report: the i860's instructions,
+ * and the m68k's accesses to the board (those to VRAM separately). */
+void NDRustBoard::stats(void) {
+    nd_status s = {};
+    s.size = sizeof(s);
+    nd_get_status(board, &s);
+    double secs = statsInterval / (ConfigureParams.System.nCpuFreq * 1000000.0);
+    uint64_t n = s.instructions - statsInstructions;
+    Log_Printf(LOG_WARN, "[ND] Slot %i stats: i860 %llu instructions (%.2f MIPS); m68k %llu reads, "
+               "%llu writes of the board, VRAM %llu bytes read, %llu written", slot,
+               (unsigned long long)n, n / secs / 1e6, (unsigned long long)statsHostReads,
+               (unsigned long long)statsHostWrites, (unsigned long long)statsVramRead,
+               (unsigned long long)statsVramWritten);
+    statsInstructions = s.instructions;
+    statsHostReads = statsHostWrites = statsVramRead = statsVramWritten = 0;
+}
+
 void NDRustBoard::tick(int nHostCycles) {
     hostCycles += nHostCycles;
     nd_advance(board, hostCycles);
+
+    if (statsInterval && hostCycles >= statsNext) {
+        statsNext = hostCycles + statsInterval;
+        stats();
+    }
+
+    if (snapDir && (hostCycles >= snapNext || Automation_SnapshotRequest)) {
+        Automation_SnapshotRequest = 0;
+        snapNext = hostCycles + snapInterval;
+        snapshot();
+    }
 
     /* The status bar LED: off when stopped, 1 in the ROM, 2 running */
     if (++ledTicks < 1024) return;
