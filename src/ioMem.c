@@ -162,7 +162,7 @@ uae_u32 IoMem_bget(uaecptr addr)
 
 	val = IoMem_ReadByte(addr);
 
-	LOG_TRACE(TRACE_IOMEM_RD, "IO read.b $%08x = $%02x\n", addr, val);
+	LOG_TRACE(TRACE_IOMEM_RD, "IO read.b $%08x = $%02x pc=$%08x\n", addr, val, m68k_getpc());
 
 	return val;
 }
@@ -203,7 +203,7 @@ uae_u32 IoMem_wget(uaecptr addr)
 
 	val = IoMem_ReadWord(addr);
 
-	LOG_TRACE(TRACE_IOMEM_RD, "IO read.w $%08x = $%04x\n", addr, val);
+	LOG_TRACE(TRACE_IOMEM_RD, "IO read.w $%08x = $%04x pc=$%08x\n", addr, val, m68k_getpc());
 
 	return val;
 }
@@ -244,7 +244,7 @@ uae_u32 IoMem_lget(uaecptr addr)
 
 	val = IoMem_ReadLong(addr);
 
-	LOG_TRACE(TRACE_IOMEM_RD, "IO read.l $%08x = $%08x\n", addr, val);
+	LOG_TRACE(TRACE_IOMEM_RD, "IO read.l $%08x = $%08x pc=$%08x\n", addr, val, m68k_getpc());
 
 	return val;
 }
@@ -256,7 +256,7 @@ uae_u32 IoMem_lget(uaecptr addr)
  */
 void IoMem_bput(uaecptr addr, uae_u32 val)
 {
-	LOG_TRACE(TRACE_IOMEM_WR, "IO write.b $%08x = $%02x\n", addr, val&0xff);
+	LOG_TRACE(TRACE_IOMEM_WR, "IO write.b $%08x = $%02x pc=$%08x\n", addr, val&0xff, m68k_getpc());
 
 	IoAccessMask = nAccessMask[addr & IO_MASK];
 	IoAccessSize = nAccessSize[addr & IO_MASK];
@@ -295,7 +295,7 @@ void IoMem_bput(uaecptr addr, uae_u32 val)
  */
 void IoMem_wput(uaecptr addr, uae_u32 val)
 {
-	LOG_TRACE(TRACE_IOMEM_WR, "IO write.w $%08x = $%04x\n", addr, val&0xffff);
+	LOG_TRACE(TRACE_IOMEM_WR, "IO write.w $%08x = $%04x pc=$%08x\n", addr, val&0xffff, m68k_getpc());
 
 	if (addr & (SIZE_WORD - 1))
 	{
@@ -337,7 +337,7 @@ void IoMem_wput(uaecptr addr, uae_u32 val)
  */
 void IoMem_lput(uaecptr addr, uae_u32 val)
 {
-	LOG_TRACE(TRACE_IOMEM_WR, "IO write.l $%08x = $%08x\n", addr, val);
+	LOG_TRACE(TRACE_IOMEM_WR, "IO write.l $%08x = $%08x pc=$%08x\n", addr, val, m68k_getpc());
 
 	if (addr & (SIZE_LONG - 1))
 	{

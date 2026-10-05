@@ -407,6 +407,34 @@ static void Main_LoadInitialConfig(void) {
 
 /*-----------------------------------------------------------------------*/
 /**
+ * Options for scripted, headless runs, from the environment (Previous
+ * takes no command-line options):
+ * PREVIOUS_TRACE        trace flags, as the debugger's "trace" command
+ *                       takes them (for example "io_all,cpu_exception")
+ * PREVIOUS_TRACE_FILE   where trace output goes (default: stderr)
+ * PREVIOUS_DEBUG_SCRIPT a file of debugger commands run at startup
+ *                       (breakpoints, "trace" changes at given addresses)
+ */
+static void Main_EnvOptions(void) {
+	const char *s;
+
+	if ((s = getenv("PREVIOUS_TRACE_FILE")) != NULL && *s) {
+		snprintf(ConfigureParams.Log.sTraceFileName,
+		         sizeof(ConfigureParams.Log.sTraceFileName), "%s", s);
+	}
+	if ((s = getenv("PREVIOUS_TRACE")) != NULL && *s) {
+		const char *err = Log_SetTraceOptions(s);
+		if (err) {
+			fprintf(stderr, "PREVIOUS_TRACE: %s\n", err);
+		}
+	}
+	if ((s = getenv("PREVIOUS_DEBUG_SCRIPT")) != NULL && *s) {
+		DebugUI_AddParseFile(s);
+	}
+}
+
+/*-----------------------------------------------------------------------*/
+/**
  * Set system information and initial help message
  */
 static void Main_StatusbarSetup(void) {
@@ -501,6 +529,9 @@ int main(int argc, char *argv[])
 
 	/* monitor type option might require "reset" -> true */
 	Configuration_Apply(true);
+
+	/* Trace and debugger options for scripted runs */
+	Main_EnvOptions();
 
 #ifdef WIN32
 	Win_OpenCon();
