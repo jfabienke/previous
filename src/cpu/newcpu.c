@@ -46,6 +46,7 @@
 #include "cycInt.h"
 #include "dsp.h"
 #include "dimension.hpp"
+#include "automation.h"
 #include "sysReg.h"
 #include "debugcpu.h"
 #endif
@@ -5137,6 +5138,7 @@ static inline void run_other_MPUs(void)
 #endif
 	if(ndCycles > 100) {
 		i860_Run(ndCycles);
+		Automation_Run(ndCycles);
 		ndCycles = 0;
 	}
 

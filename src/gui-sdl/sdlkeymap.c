@@ -566,6 +566,16 @@ void Keymap_MouseWheel(const SDL_MouseWheelEvent *sdlwheel)
 
 /*-----------------------------------------------------------------------*/
 /**
+ * The NeXT key of a host scancode, for scripted input (automation.c)
+ */
+uint8_t Keymap_NeXTKeyForScancode(SDL_Scancode sdlscancode)
+{
+	return Keymap_GetKeyFromScancode(sdlscancode);
+}
+
+
+/*-----------------------------------------------------------------------*/
+/**
  * User pressed a key down
  */
 void Keymap_KeyDown(const SDL_KeyboardEvent *sdlkey)

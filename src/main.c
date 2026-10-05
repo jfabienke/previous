@@ -13,6 +13,7 @@ const char Main_fileid[] = "Previous main.c";
 #include <signal.h>
 
 #include "main.h"
+#include "automation.h"
 #include "event.h"
 #include "timing.h"
 #include "configuration.h"
@@ -532,6 +533,7 @@ int main(int argc, char *argv[])
 
 	/* Trace and debugger options for scripted runs */
 	Main_EnvOptions();
+	Automation_Init();
 
 #ifdef WIN32
 	Win_OpenCon();

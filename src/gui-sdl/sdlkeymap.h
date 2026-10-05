@@ -17,5 +17,6 @@ extern void Keymap_MouseUp(bool left);
 
 extern void Keymap_KeyDown(const SDL_KeyboardEvent *sdlkey);
 extern void Keymap_KeyUp(const SDL_KeyboardEvent *sdlkey);
+extern uint8_t Keymap_NeXTKeyForScancode(SDL_Scancode sdlscancode);
 
 #endif /* PREV_SDLKEYMAP_H */
