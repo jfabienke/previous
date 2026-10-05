@@ -207,6 +207,7 @@ bool Change_DoNeedReset(CNF_PARAMS *current, CNF_PARAMS *changed)
 	/* Did we change NeXTdimension? */
 	for (i = 0; i < ND_MAX_BOARDS; i++) {
 		if (current->Dimension.board[i].bEnabled != changed->Dimension.board[i].bEnabled ||
+			current->Dimension.board[i].nCore != changed->Dimension.board[i].nCore ||
 			strcmp(current->Dimension.board[i].szRomFileName, changed->Dimension.board[i].szRomFileName)) {
 			printf("dimension reset\n");
 			return true;

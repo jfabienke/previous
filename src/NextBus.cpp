@@ -10,6 +10,9 @@
 #include "NextBus.hpp"
 #include "nbic.h"
 #include "dimension.hpp"
+#ifdef ENABLE_ND_RUST
+#include "nd_rust.hpp"
+#endif
 
 static uint8_t bus_error(uint32_t addr, int read, int size, uint32_t val, const char* acc) {
     Log_Printf(LOG_WARN, "[NextBus] Bus error %s at %08X", acc, addr);
@@ -181,6 +184,12 @@ extern "C" {
             remove_board(ND_SLOT(i));
             if (ConfigureParams.Dimension.board[i].bEnabled && ConfigureParams.System.nMachineType != NEXT_STATION) {
                 Log_Printf(LOG_WARN, "[NextBus] NeXTdimension board at slot %i", ND_SLOT(i));
+#ifdef ENABLE_ND_RUST
+                if (ConfigureParams.Dimension.board[i].nCore == ND_CORE_RUST) {
+                    insert_board(new NDRustBoard(ND_SLOT(i)));
+                    continue;
+                }
+#endif
                 insert_board(new NextDimension(ND_SLOT(i)));
             }
         }

@@ -56,6 +56,16 @@ set(ENABLE_DSP_EMU 1
 set(ENABLE_TRACING 1
     CACHE BOOL "Enable tracing messages for debugging")
 
+# The NeXTdimension of the nextdimension-archive (emulator/nd-ffi), built
+# with cargo from ND_RUST_DIR, the archive's emulator workspace. A board
+# uses it with nCore<n> = 1 in [Dimension].
+set(ENABLE_ND_RUST 0
+    CACHE BOOL "Enable the Rust NeXTdimension board (nd-ffi)")
+set(ND_RUST_DIR "" CACHE PATH "The nextdimension-archive's emulator workspace")
+if(ENABLE_ND_RUST AND NOT EXISTS "${ND_RUST_DIR}/nd-ffi/include/nd_ffi.h")
+	message(FATAL_ERROR "ENABLE_ND_RUST needs ND_RUST_DIR, the emulator workspace holding nd-ffi")
+endif()
+
 # Configure Previous with AddressSanitizer:
 #   cd build; make clean; cmake -D ENABLE_ASAN:BOOL=1 -D ..
 # If everything's fine, CMake output should include:

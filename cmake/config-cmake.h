@@ -95,3 +95,6 @@
 
 /* Define to 1 to enable rendering threads for higher efficiency */
 #cmakedefine ENABLE_RENDERING_THREAD 1
+
+/* Define to 1 to enable the Rust NeXTdimension board (nd-ffi) */
+#cmakedefine ENABLE_ND_RUST 1

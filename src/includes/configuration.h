@@ -378,9 +378,12 @@ typedef struct
 
 /* NeXT Dimension configuration */
 #define ND_MAX_BOARDS   3
+#define ND_CORE_BUILTIN 0   /* Previous's NeXTdimension emulation */
+#define ND_CORE_RUST    1   /* the nd-ffi board (ENABLE_ND_RUST) */
 typedef struct
 {
   bool bEnabled;
+  int  nCore;
   int  nMemoryBankSize[4];
   char szRomFileName[FILENAME_MAX];
 } NDBOARD;

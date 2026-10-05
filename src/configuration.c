@@ -349,6 +349,7 @@ static const struct Config_Tag configs_Dimension[] =
 	{ "nConsoleSlot",      Int_Tag,  &ConfigureParams.Dimension.nConsoleSlot },
 
 	{ "bEnabled0",         Bool_Tag, &ConfigureParams.Dimension.board[0].bEnabled },
+	{ "nCore0",            Int_Tag,  &ConfigureParams.Dimension.board[0].nCore },
 	{ "nMemoryBankSize00", Int_Tag,  &ConfigureParams.Dimension.board[0].nMemoryBankSize[0] },
 	{ "nMemoryBankSize01", Int_Tag,  &ConfigureParams.Dimension.board[0].nMemoryBankSize[1] },
 	{ "nMemoryBankSize02", Int_Tag,  &ConfigureParams.Dimension.board[0].nMemoryBankSize[2] },
@@ -356,6 +357,7 @@ static const struct Config_Tag configs_Dimension[] =
 	{ "szRomFileName0", String_Tag,  ConfigureParams.Dimension.board[0].szRomFileName },
 
 	{ "bEnabled1",         Bool_Tag, &ConfigureParams.Dimension.board[1].bEnabled },
+	{ "nCore1",            Int_Tag,  &ConfigureParams.Dimension.board[1].nCore },
 	{ "nMemoryBankSize10", Int_Tag,  &ConfigureParams.Dimension.board[1].nMemoryBankSize[0] },
 	{ "nMemoryBankSize11", Int_Tag,  &ConfigureParams.Dimension.board[1].nMemoryBankSize[1] },
 	{ "nMemoryBankSize12", Int_Tag,  &ConfigureParams.Dimension.board[1].nMemoryBankSize[2] },
@@ -363,6 +365,7 @@ static const struct Config_Tag configs_Dimension[] =
 	{ "szRomFileName1", String_Tag,  ConfigureParams.Dimension.board[1].szRomFileName },
 
 	{ "bEnabled2",         Bool_Tag, &ConfigureParams.Dimension.board[2].bEnabled },
+	{ "nCore2",            Int_Tag,  &ConfigureParams.Dimension.board[2].nCore },
 	{ "nMemoryBankSize20", Int_Tag,  &ConfigureParams.Dimension.board[2].nMemoryBankSize[0] },
 	{ "nMemoryBankSize21", Int_Tag,  &ConfigureParams.Dimension.board[2].nMemoryBankSize[1] },
 	{ "nMemoryBankSize22", Int_Tag,  &ConfigureParams.Dimension.board[2].nMemoryBankSize[2] },
@@ -550,6 +553,7 @@ void Configuration_SetDefault(void)
 	ConfigureParams.Dimension.nConsoleSlot = 0;
 	for (i = 0; i < ND_MAX_BOARDS; i++) {
 		ConfigureParams.Dimension.board[i].bEnabled           = false;
+		ConfigureParams.Dimension.board[i].nCore              = ND_CORE_BUILTIN;
 		ConfigureParams.Dimension.board[i].nMemoryBankSize[0] = 4;
 		ConfigureParams.Dimension.board[i].nMemoryBankSize[1] = 4;
 		ConfigureParams.Dimension.board[i].nMemoryBankSize[2] = 4;
@@ -596,6 +600,12 @@ static void Configuration_CheckDimensionSettings(void) {
 		if (ConfigureParams.System.nMachineType==NEXT_STATION) {
 			ConfigureParams.Dimension.board[i].bEnabled = false;
 		}
+		if (ConfigureParams.Dimension.board[i].nCore != ND_CORE_RUST) {
+			ConfigureParams.Dimension.board[i].nCore = ND_CORE_BUILTIN;
+		}
+#ifndef ENABLE_ND_RUST
+		ConfigureParams.Dimension.board[i].nCore = ND_CORE_BUILTIN;
+#endif
 		if (ConfigureParams.Dimension.board[i].bEnabled) {
 			Configuration_CheckDimensionMemory(ConfigureParams.Dimension.board[i].nMemoryBankSize);
 			ConfigureParams.System.bNBIC = true;
