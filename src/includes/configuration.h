@@ -385,6 +385,9 @@ typedef struct
   bool bEnabled;
   int  nCore;
   int  nMemoryBankSize[4];
+  int  nVRAMSize;       /* MB; 0 = 4 (ND_CORE_RUST only, as the two below) */
+  int  nDisplayWidth;   /* 0 = the NeXTdimension's 1120 x 832 */
+  int  nDisplayHeight;
   char szRomFileName[FILENAME_MAX];
 } NDBOARD;
 

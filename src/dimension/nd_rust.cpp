@@ -90,6 +90,11 @@ static nd_board* nd_rust_create(int* slot) {
     c.host_hz = ConfigureParams.System.nCpuFreq * 1000000;
     c.sync    = ND_SYNC_LOCKSTEP;
     c.lag     = ND_LAG_HOST_WAITS;
+    /* A larger screen than the NeXTdimension's, for NeXT's software patched
+     * to draw it (nCore = 1 only) */
+    c.vram_mb        = cfg->nVRAMSize;
+    c.display_width  = cfg->nDisplayWidth;
+    c.display_height = cfg->nDisplayHeight;
     c.log     = nd_rust_log;
     c.user    = slot;
 
@@ -113,7 +118,15 @@ NDRustBoard::NDRustBoard(int slot) :
     lastInstructions(0),
     lastHostTime(0)
 {
+    uint32_t w, h, pitch;
+
     report[0] = 0;
+    nd_display_geometry(board, &w, &h, &pitch);
+    if (w != ND_DISPLAY_WIDTH || h != ND_DISPLAY_HEIGHT || pitch != ND_VRAM_PITCH) {
+        Log_Printf(LOG_WARN, "[ND] Slot %i: display %u x %u on %u-pixel lines, %i MB VRAM",
+                   slot, w, h, pitch, ConfigureParams.Dimension.board[ND_NUM(slot)].nVRAMSize);
+    }
+    sdl.geometry(w, h, pitch);
     sdl.init();
     const char* trace = getenv("PREVIOUS_ND_TRACE");
     if (trace && !nd_trace) {

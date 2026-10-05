@@ -14,7 +14,7 @@
 
 
 #ifdef ENABLE_RENDERING_THREAD
-NDSDL::NDSDL(int slot, uint32_t* vram) : slot(slot), vram(vram), ndWindow(NULL), ndRenderer(NULL), ndTexture(NULL), doRepaint(true), repaintThread(NULL) {}
+NDSDL::NDSDL(int slot, uint32_t* vram) : slot(slot), vram(vram), width(NeXT_SCRN_W), height(NeXT_SCRN_H), pitch(NeXT_SCRN_W + 32), ndWindow(NULL), ndRenderer(NULL), ndTexture(NULL), doRepaint(true), repaintThread(NULL) {}
 
 int NDSDL::repainter(void *_this) {
     return ((NDSDL*)_this)->repainter();
@@ -34,12 +34,20 @@ int NDSDL::repainter(void) {
     return 0;
 }
 #else // !ENABLE_RENDERING_THREAD
-NDSDL::NDSDL(int slot, uint32_t* vram) : slot(slot), vram(vram), ndWindow(NULL), ndRenderer(NULL), ndTexture(NULL) {}
+NDSDL::NDSDL(int slot, uint32_t* vram) : slot(slot), vram(vram), width(NeXT_SCRN_W), height(NeXT_SCRN_H), pitch(NeXT_SCRN_W + 32), ndWindow(NULL), ndRenderer(NULL), ndTexture(NULL) {}
 #endif // !ENABLE_RENDERING_THREAD
+
+/* A board whose screen is not the NeXTdimension's 1120 x 832 on 1152;
+ * before init(). */
+void NDSDL::geometry(int w, int h, int p) {
+    width  = w;
+    height = h;
+    pitch  = p;
+}
 
 void NDSDL::repaint(void) {
     if (nd_video_enabled_for_slot(slot)) {
-        Screen_BlitDimension(vram, ndTexture);
+        Screen_BlitDimensionSized(vram, ndTexture, width, height, pitch);
     } else {
         Screen_Blank(ndTexture);
     }
@@ -55,7 +63,7 @@ void NDSDL::init(void) {
     if (ConfigureParams.Screen.nMode == SCREEN_ALL) {
         SDL_GetWindowPosition(sdlWindow, &x, &y);
         SDL_GetWindowSize(sdlWindow, &w, &h);
-        h = (w * NeXT_SCRN_H) / NeXT_SCRN_W;
+        h = (w * height) / width;
 
         if (!ndWindow) {
             snprintf(name, sizeof(name), "NeXTdimension (Slot %i)", slot);
@@ -65,8 +73,8 @@ void NDSDL::init(void) {
                 return;
             }
             SDL_SetWindowPosition(ndWindow, x+14*slot, y+14*slot);
-            SDL_SetRenderLogicalPresentation(ndRenderer, NeXT_SCRN_W, NeXT_SCRN_H, SDL_LOGICAL_PRESENTATION_STRETCH);
-            ndTexture = SDL_CreateTexture(ndRenderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, NeXT_SCRN_W, NeXT_SCRN_H);
+            SDL_SetRenderLogicalPresentation(ndRenderer, width, height, SDL_LOGICAL_PRESENTATION_STRETCH);
+            ndTexture = SDL_CreateTexture(ndRenderer, SDL_PIXELFORMAT_BGRA32, SDL_TEXTUREACCESS_STREAMING, width, height);
             SDL_SetTextureBlendMode(ndTexture, SDL_BLENDMODE_NONE);
 #ifdef ENABLE_RENDERING_THREAD
             SDL_SetRenderVSync(ndRenderer, 1);
@@ -108,7 +116,7 @@ void NDSDL::destroy(void) {
 
 void NDSDL::resize(float scale) {
     if (ndWindow) {
-        SDL_SetWindowSize(ndWindow, (int)SDL_lroundf(scale*NeXT_SCRN_W), (int)SDL_lroundf(scale*NeXT_SCRN_H));
+        SDL_SetWindowSize(ndWindow, (int)SDL_lroundf(scale*width), (int)SDL_lroundf(scale*height));
     }
 }
 

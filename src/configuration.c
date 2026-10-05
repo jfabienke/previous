@@ -350,6 +350,9 @@ static const struct Config_Tag configs_Dimension[] =
 
 	{ "bEnabled0",         Bool_Tag, &ConfigureParams.Dimension.board[0].bEnabled },
 	{ "nCore0",            Int_Tag,  &ConfigureParams.Dimension.board[0].nCore },
+	{ "nVRAMSize0",        Int_Tag,  &ConfigureParams.Dimension.board[0].nVRAMSize },
+	{ "nDisplayWidth0",    Int_Tag,  &ConfigureParams.Dimension.board[0].nDisplayWidth },
+	{ "nDisplayHeight0",   Int_Tag,  &ConfigureParams.Dimension.board[0].nDisplayHeight },
 	{ "nMemoryBankSize00", Int_Tag,  &ConfigureParams.Dimension.board[0].nMemoryBankSize[0] },
 	{ "nMemoryBankSize01", Int_Tag,  &ConfigureParams.Dimension.board[0].nMemoryBankSize[1] },
 	{ "nMemoryBankSize02", Int_Tag,  &ConfigureParams.Dimension.board[0].nMemoryBankSize[2] },
@@ -358,6 +361,9 @@ static const struct Config_Tag configs_Dimension[] =
 
 	{ "bEnabled1",         Bool_Tag, &ConfigureParams.Dimension.board[1].bEnabled },
 	{ "nCore1",            Int_Tag,  &ConfigureParams.Dimension.board[1].nCore },
+	{ "nVRAMSize1",        Int_Tag,  &ConfigureParams.Dimension.board[1].nVRAMSize },
+	{ "nDisplayWidth1",    Int_Tag,  &ConfigureParams.Dimension.board[1].nDisplayWidth },
+	{ "nDisplayHeight1",   Int_Tag,  &ConfigureParams.Dimension.board[1].nDisplayHeight },
 	{ "nMemoryBankSize10", Int_Tag,  &ConfigureParams.Dimension.board[1].nMemoryBankSize[0] },
 	{ "nMemoryBankSize11", Int_Tag,  &ConfigureParams.Dimension.board[1].nMemoryBankSize[1] },
 	{ "nMemoryBankSize12", Int_Tag,  &ConfigureParams.Dimension.board[1].nMemoryBankSize[2] },
@@ -366,6 +372,9 @@ static const struct Config_Tag configs_Dimension[] =
 
 	{ "bEnabled2",         Bool_Tag, &ConfigureParams.Dimension.board[2].bEnabled },
 	{ "nCore2",            Int_Tag,  &ConfigureParams.Dimension.board[2].nCore },
+	{ "nVRAMSize2",        Int_Tag,  &ConfigureParams.Dimension.board[2].nVRAMSize },
+	{ "nDisplayWidth2",    Int_Tag,  &ConfigureParams.Dimension.board[2].nDisplayWidth },
+	{ "nDisplayHeight2",   Int_Tag,  &ConfigureParams.Dimension.board[2].nDisplayHeight },
 	{ "nMemoryBankSize20", Int_Tag,  &ConfigureParams.Dimension.board[2].nMemoryBankSize[0] },
 	{ "nMemoryBankSize21", Int_Tag,  &ConfigureParams.Dimension.board[2].nMemoryBankSize[1] },
 	{ "nMemoryBankSize22", Int_Tag,  &ConfigureParams.Dimension.board[2].nMemoryBankSize[2] },
@@ -554,6 +563,9 @@ void Configuration_SetDefault(void)
 	for (i = 0; i < ND_MAX_BOARDS; i++) {
 		ConfigureParams.Dimension.board[i].bEnabled           = false;
 		ConfigureParams.Dimension.board[i].nCore              = ND_CORE_BUILTIN;
+		ConfigureParams.Dimension.board[i].nVRAMSize          = 0;
+		ConfigureParams.Dimension.board[i].nDisplayWidth      = 0;
+		ConfigureParams.Dimension.board[i].nDisplayHeight     = 0;
 		ConfigureParams.Dimension.board[i].nMemoryBankSize[0] = 4;
 		ConfigureParams.Dimension.board[i].nMemoryBankSize[1] = 4;
 		ConfigureParams.Dimension.board[i].nMemoryBankSize[2] = 4;

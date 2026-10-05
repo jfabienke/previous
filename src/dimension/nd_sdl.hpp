@@ -19,6 +19,9 @@
 class NDSDL {
     int           slot;
     uint32_t*     vram;
+    int           width;    /* displayed frame and VRAM pitch in pixels */
+    int           height;
+    int           pitch;
     SDL_Window*   ndWindow;
     SDL_Renderer* ndRenderer;
     SDL_Texture*  ndTexture;
@@ -32,6 +35,7 @@ class NDSDL {
 #endif
 public:
     NDSDL(int slot, uint32_t* vram);
+    void    geometry(int width, int height, int pitch);
     void    repaint(void);
     void    init(void);
     void    uninit(void);

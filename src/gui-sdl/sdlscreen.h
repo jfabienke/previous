@@ -20,6 +20,7 @@ extern SDL_Surface *sdlscrn;
 extern void Screen_UpdateRects(SDL_Surface *screen, int numrects, SDL_Rect *rects);
 extern void Screen_UpdateRect(SDL_Surface *screen, int32_t x, int32_t y, int32_t w, int32_t h);
 extern void Screen_BlitDimension(uint32_t* vram, SDL_Texture* tex);
+extern void Screen_BlitDimensionSized(uint32_t* vram, SDL_Texture* tex, int width, int height, int pitch);
 extern void Screen_Blank(SDL_Texture* tex);
 
 extern bool Screen_Repaint(void);

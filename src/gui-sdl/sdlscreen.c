@@ -131,6 +131,15 @@ static void blitColor(SDL_Texture* tex) {
  Dimension format is 8 bit per pixel, big-endian: BBGGRRAA
  */
 void Screen_BlitDimension(uint32_t* vram, SDL_Texture* tex) {
+	Screen_BlitDimensionSized(vram, tex, NeXT_SCRN_W, NeXT_SCRN_H, NeXT_SCRN_W + 32);
+}
+
+/*
+ Blit a NeXTdimension frame of width x height pixels on lines of pitch
+ pixels (a board with a larger screen than the NeXTdimension's 1120 x 832
+ on 1152); a smaller texture shows its top left.
+ */
+void Screen_BlitDimensionSized(uint32_t* vram, SDL_Texture* tex, int width, int height, int pitch) {
 	void* src;
 	void* dst;
 	int src_pitch, dst_pitch;
@@ -141,12 +150,14 @@ void Screen_BlitDimension(uint32_t* vram, SDL_Texture* tex) {
 #else
 	src = &vram[4];
 #endif
-	src_pitch  = (NeXT_SCRN_W + 32) * 4;
+	src_pitch  = pitch * 4;
 	src_format = SDL_PIXELFORMAT_BGRA32;
 	dst_format = tex->format;
+	if (width > tex->w) width = tex->w;
+	if (height > tex->h) height = tex->h;
 
 	SDL_LockTexture(tex, NULL, &dst, &dst_pitch);
-	SDL_ConvertPixels(NeXT_SCRN_W, NeXT_SCRN_H, src_format, src, src_pitch, dst_format, dst, dst_pitch);
+	SDL_ConvertPixels(width, height, src_format, src, src_pitch, dst_format, dst, dst_pitch);
 	SDL_UnlockTexture(tex);
 }
 
@@ -157,7 +168,7 @@ void Screen_Blank(SDL_Texture* tex) {
 	void* pixels;
 	int   pitch;
 	SDL_LockTexture(tex, NULL, &pixels, &pitch);
-	SDL_memset4(pixels, COL2RGB[0], pitch * NeXT_SCRN_H / 4);
+	SDL_memset4(pixels, COL2RGB[0], pitch * tex->h / 4);
 	SDL_UnlockTexture(tex);
 }
 

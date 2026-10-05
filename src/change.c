@@ -208,6 +208,9 @@ bool Change_DoNeedReset(CNF_PARAMS *current, CNF_PARAMS *changed)
 	for (i = 0; i < ND_MAX_BOARDS; i++) {
 		if (current->Dimension.board[i].bEnabled != changed->Dimension.board[i].bEnabled ||
 			current->Dimension.board[i].nCore != changed->Dimension.board[i].nCore ||
+			current->Dimension.board[i].nVRAMSize != changed->Dimension.board[i].nVRAMSize ||
+			current->Dimension.board[i].nDisplayWidth != changed->Dimension.board[i].nDisplayWidth ||
+			current->Dimension.board[i].nDisplayHeight != changed->Dimension.board[i].nDisplayHeight ||
 			strcmp(current->Dimension.board[i].szRomFileName, changed->Dimension.board[i].szRomFileName)) {
 			printf("dimension reset\n");
 			return true;
