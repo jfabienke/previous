@@ -40,11 +40,6 @@ public:
     void   set_intstatus(bool set);
 };
 
-extern "C" {
-#endif /* __cplusplus */
-    void   nd_nbic_interrupt(void);
-#ifdef __cplusplus
-}
 #endif /* __cplusplus */
 
 #endif /* __ND_NBIC_H__ */

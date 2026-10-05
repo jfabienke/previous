@@ -168,7 +168,7 @@ static bool blitScreen(int slot, SDL_Texture* tex) {
 	if (slot > 0) {
 		uint32_t* vram = nd_vram_for_slot(slot);
 		if (vram) {
-			if (nd_video_enabled(slot)) {
+			if (nd_video_enabled_for_slot(slot)) {
 				Screen_BlitDimension(vram, tex);
 			} else {
 				Screen_Blank(tex);

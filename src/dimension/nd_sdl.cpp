@@ -38,7 +38,7 @@ NDSDL::NDSDL(int slot, uint32_t* vram) : slot(slot), vram(vram), ndWindow(NULL),
 #endif // !ENABLE_RENDERING_THREAD
 
 void NDSDL::repaint(void) {
-    if (nd_video_enabled(slot)) {
+    if (nd_video_enabled_for_slot(slot)) {
         Screen_BlitDimension(vram, ndTexture);
     } else {
         Screen_Blank(ndTexture);
@@ -121,8 +121,8 @@ void NDSDL::titlebar(bool show) {
 #ifndef ENABLE_RENDERING_THREAD
 void nd_sdl_repaint(void) {
     FOR_EACH_SLOT(slot) {
-        IF_NEXT_DIMENSION(slot, nd) {
-            nd->sdl.repaint();
+        IF_ND_BOARD(slot, nd) {
+            nd->display().repaint();
         }
     }
 }
@@ -130,32 +130,32 @@ void nd_sdl_repaint(void) {
 
 void nd_sdl_titlebar(bool show) {
     FOR_EACH_SLOT(slot) {
-        IF_NEXT_DIMENSION(slot, nd) {
-            nd->sdl.titlebar(show);
+        IF_ND_BOARD(slot, nd) {
+            nd->display().titlebar(show);
         }
     }
 }
 
 void nd_sdl_resize(float scale) {
     FOR_EACH_SLOT(slot) {
-        IF_NEXT_DIMENSION(slot, nd) {
-            nd->sdl.resize(scale);
+        IF_ND_BOARD(slot, nd) {
+            nd->display().resize(scale);
         }
     }
 }
 
 void nd_sdl_show(void) {
     FOR_EACH_SLOT(slot) {
-        IF_NEXT_DIMENSION(slot, nd) {
-            nd->sdl.init();
+        IF_ND_BOARD(slot, nd) {
+            nd->display().init();
         }
     }
 }
 
 void nd_sdl_hide(void) {
     FOR_EACH_SLOT(slot) {
-        IF_NEXT_DIMENSION(slot, nd) {
-            nd->sdl.uninit();
+        IF_ND_BOARD(slot, nd) {
+            nd->display().uninit();
         }
     }
 }

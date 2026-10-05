@@ -47,7 +47,6 @@ typedef int64_t offs_t;
 extern "C" {
     class NextDimension;
     
-    void   nd_nbic_interrupt(void);
     void   Statusbar_SetNdLed(int state);
     typedef void (*mem_rd_func)(const NextDimension*, UINT32, UINT32*);
     typedef void (*mem_wr_func)(const NextDimension*, UINT32, const UINT32*);
@@ -441,6 +440,7 @@ public:
     /* External interface */
     void init(void);
     void set_run_func(void);
+    bool threaded(void) const { return m_thread != NULL; }
     void uninit(void);
     void halt(bool state);
     void pause(bool state);

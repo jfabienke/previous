@@ -24,6 +24,7 @@
 #include "i860.hpp"
 #include "dimension.hpp"
 #include "main.h"
+#include "sysReg.h"
 #include "event.h"
 #include "log.h"
 
@@ -32,29 +33,20 @@ extern "C" {
 
     i860_run_func i860_Run = i860_run_nop;
 
-    static void i860_run_thread(int nHostCycles) {
-        nd_nbic_interrupt();
-    }
+    /* Run every board, then raise the m68k's remote interrupt if any
+     * board's NBIC asserts GINT*. A builtin board with a thread of its
+     * own runs there. */
+    void nd_run_boards(int nHostCycles) {
+        bool gint = false;
 
-    static void i860_run_no_thread(int nHostCycles) {
-        int cycles;
-        
         FOR_EACH_SLOT(slot) {
-            IF_NEXT_DIMENSION(slot, nd) {
-                nd->handle_msgs();
-                
-                if(nd->i860.is_halted()) return;
-                
-                cycles = nHostCycles * 33; // i860 @ 33MHz
-                cycles /= ConfigureParams.System.nCpuFreq;
-                while (cycles > 0) {
-                    nd->i860.run_cycle();
-                    cycles --;
-                }
+            IF_ND_BOARD(slot, nd) {
+                nd->tick(nHostCycles);
+                gint |= nd->gint();
             }
         }
-        nd_nbic_interrupt();
-    }    
+        set_interrupt(INT_REMOTE, gint ? SET_INT : RELEASE_INT);
+    }
 }
 
 i860_cpu_device::i860_cpu_device(NextDimension* nd) : nd(nd) {
@@ -429,7 +421,7 @@ int i860_cpu_device::memtest(bool be) {
 }
 
 void i860_cpu_device::set_run_func(void) {
-    i860_Run = ConfigureParams.Dimension.bI860Thread ? i860_run_thread : i860_run_no_thread;
+    i860_Run = nd_run_boards;
 }
 
 void i860_cpu_device::init(void) {
@@ -542,11 +534,9 @@ error:
 
     nd->send_msg(MSG_I860_RESET);
     if(ConfigureParams.Dimension.bI860Thread) {
-        i860_Run = i860_run_thread;
         m_thread = host_thread_create(i860_cpu_device::thread, m_thread_name, this);
-    } else {
-        i860_Run = i860_run_no_thread;
     }
+    i860_Run = nd_run_boards;
 }
 
 void i860_cpu_device::uninit() {

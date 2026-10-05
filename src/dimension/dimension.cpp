@@ -37,7 +37,7 @@
 #define nd68k_cs8get(addr)    (nd68k_get_mem_bank(addr)->cs8geti(addr))
 
 NextDimension::NextDimension(int slot) :
-    NextBusBoard(slot),
+    NDBoard(slot),
     mem_banks(new ND_Addrbank*[65536]),
     ram(malloc_aligned(64*1024*1024)),
     vram(malloc_aligned(4*1024*1024)),
@@ -85,6 +85,36 @@ void NextDimension::reset(void) {
 
 void NextDimension::pause(bool pause) {
     i860.pause(pause);
+}
+
+/* Run the i860 on the m68k thread, unless it has a thread of its own */
+void NextDimension::tick(int nHostCycles) {
+    if (i860.threaded()) return;
+
+    handle_msgs();
+    if (i860.is_halted()) return;
+
+    int cycles = nHostCycles * 33; // i860 @ 33MHz
+    cycles /= ConfigureParams.System.nCpuFreq;
+    while (cycles > 0) {
+        i860.run_cycle();
+        cycles--;
+    }
+}
+
+bool NextDimension::gint(void) {
+    return (NBIC::remInter & NBIC::remInterMask) & (1 << slot);
+}
+
+void NextDimension::host_vbl(int which, bool blank) {
+    if (which == ND_DISPLAY) {
+        display_vbl = blank;
+        send_msg(MSG_DISPLAY_BLANK);
+        host_atomic_set(&i860.i860cycles, (1000*1000*33)/136);
+    } else {
+        video_vbl = blank;
+        send_msg(MSG_VIDEO_BLANK);
+    }
 }
 
 /* NeXTdimension board memory access (m68k) */
@@ -331,10 +361,8 @@ extern "C" {
         Timing_BlankCount(ND_DISPLAY, bBlankToggle);
         
         FOR_EACH_SLOT(slot) {
-            IF_NEXT_DIMENSION(slot, nd) {
-                nd->display_vbl = bBlankToggle;
-                nd->send_msg(MSG_DISPLAY_BLANK);
-                host_atomic_set(&nd->i860.i860cycles, (1000*1000*33)/136);
+            IF_ND_BOARD(slot, nd) {
+                nd->host_vbl(ND_DISPLAY, bBlankToggle);
             }
         }
         bBlankToggle = !bBlankToggle;
@@ -349,9 +377,8 @@ extern "C" {
         Timing_BlankCount(ND_VIDEO, bBlankToggle);
         
         FOR_EACH_SLOT(slot) {
-            IF_NEXT_DIMENSION(slot, nd) {
-                nd->video_vbl = bBlankToggle;
-                nd->send_msg(MSG_VIDEO_BLANK);
+            IF_ND_BOARD(slot, nd) {
+                nd->host_vbl(ND_VIDEO, bBlankToggle);
             }
         }
         bBlankToggle = !bBlankToggle;
@@ -371,17 +398,17 @@ extern "C" {
     }
 #endif
 
-    bool nd_video_enabled(int slot) {
-        IF_NEXT_DIMENSION(slot, nd) {
-            return nd->unblanked();
+    bool nd_video_enabled_for_slot(int slot) {
+        IF_ND_BOARD(slot, nd) {
+            return nd->video_enabled();
         } else {
             return false;
         }
     }
 
     uint32_t* nd_vram_for_slot(int slot) {
-        IF_NEXT_DIMENSION(slot, nd) {
-            return (uint32_t*)nd->vram;
+        IF_ND_BOARD(slot, nd) {
+            return nd->vram_bgra();
         } else {
             return NULL;
         }
@@ -389,16 +416,16 @@ extern "C" {
 
     void nd_start_debugger(void) {
         FOR_EACH_SLOT(slot) {
-            IF_NEXT_DIMENSION(slot, nd) {
-                nd->send_msg(MSG_DBG_BREAK);
+            IF_ND_BOARD(slot, nd) {
+                nd->debug_break();
             }
         }
     }
 
     const char* nd_reports(uint64_t realTime, uint64_t hostTime) {
         FOR_EACH_SLOT(slot) {
-            IF_NEXT_DIMENSION(slot, nd) {
-                return nd->i860.reports(realTime, hostTime);
+            IF_ND_BOARD(slot, nd) {
+                return nd->reports(realTime, hostTime);
             }
         }
         return "";

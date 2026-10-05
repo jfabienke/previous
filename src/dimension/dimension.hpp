@@ -24,12 +24,13 @@ extern "C" {
 #endif /* __cplusplus */
     typedef void (*i860_run_func)(int);
     extern i860_run_func i860_Run;
+    extern void        nd_run_boards(int nHostCycles);
 
     extern void        ND_VBL_Handler(void);
     extern void        ND_Video_VBL_Handler(void);
     extern void        nd_start_interrupts(void);
     extern void        nd_display_repaint(void);
-    extern bool        nd_video_enabled(int slot);
+    extern bool        nd_video_enabled_for_slot(int slot);
     extern uint32_t*   nd_vram_for_slot(int slot);
     extern void        nd_start_debugger(void);
     extern const char* nd_reports(uint64_t realTime, uint64_t hostTime);
@@ -37,6 +38,7 @@ extern "C" {
 }
 
 #include "NextBus.hpp"
+#include "nd_board.hpp"
 #include "i860.hpp"
 #include "nd_nbic.hpp"
 #include "nd_mem.hpp"
@@ -128,7 +130,7 @@ public:
     void write(uint32_t step, uint8_t data);
 };
 
-class NextDimension : public NextBusBoard {
+class NextDimension : public NDBoard {
     /* Message port for host->dimension communication */
     atomic_int      m_port;
 public:
@@ -186,6 +188,16 @@ public:
 
     virtual void     reset(void);
     virtual void     pause(bool pause);
+
+    /* NDBoard */
+    virtual NDSDL&      display(void) { return sdl; }
+    virtual void        tick(int nHostCycles);
+    virtual bool        gint(void);
+    virtual void        host_vbl(int which, bool blank);
+    virtual uint32_t*   vram_bgra(void) { return (uint32_t*)vram; }
+    virtual bool        video_enabled(void) { return unblanked(); }
+    virtual void        debug_break(void) { send_msg(MSG_DBG_BREAK); }
+    virtual const char* reports(uint64_t realTime, uint64_t hostTime) { return i860.reports(realTime, hostTime); }
 
     static uint8_t   i860_cs8get  (const NextDimension* nd, uint32_t addr);
     static void      i860_rd8_be  (const NextDimension* nd, uint32_t addr, uint32_t* val);
