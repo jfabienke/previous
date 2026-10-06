@@ -87,9 +87,16 @@ static nd_board* nd_rust_create(int* slot) {
     }
     c.rom     = rom;
     c.rom_len = (uint32_t)len;
-    c.i860_hz = 33000000;
+    /* PREVIOUS_ND_CLOCK=MHZ: an i860 at another clock than the
+     * NeXTdimension's 33 MHz (the board takes any) */
+    const char* clock = getenv("PREVIOUS_ND_CLOCK");
+    c.i860_hz = clock ? (uint32_t)(atof(clock) * 1000000.0) : 33000000;
     c.host_hz = ConfigureParams.System.nCpuFreq * 1000000;
-    c.sync    = ND_SYNC_LOCKSTEP;
+    /* PREVIOUS_ND_SYNC=threaded: the board on a thread of its own, beside
+     * the m68k's (nd_ffi.h); otherwise in lockstep on the m68k's */
+    const char* sync = getenv("PREVIOUS_ND_SYNC");
+    bool threaded = sync && !strcmp(sync, "threaded");
+    c.sync    = threaded ? ND_SYNC_THREADED : ND_SYNC_LOCKSTEP;
     c.lag     = ND_LAG_HOST_WAITS;
     /* A larger screen than the NeXTdimension's, for NeXT's software patched
      * to draw it (nCore = 1 only) */
@@ -104,7 +111,8 @@ static nd_board* nd_rust_create(int* slot) {
     if (!b) {
         Log_Printf(LOG_ERROR, "[ND] Slot %i: the Rust board failed: %s", *slot, nd_last_error());
     } else {
-        Log_Printf(LOG_WARN, "[ND] Slot %i: Rust board (nd_ffi ABI %u), lockstep", *slot, nd_abi_version());
+        Log_Printf(LOG_WARN, "[ND] Slot %i: Rust board (nd_ffi ABI %u), %s, i860 at %.1f MHz", *slot,
+                   nd_abi_version(), threaded ? "threaded" : "lockstep", c.i860_hz / 1e6);
     }
     return b;
 }
