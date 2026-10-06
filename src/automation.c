@@ -24,6 +24,9 @@
                          or ctrl
     type TEXT            type TEXT (US layout)
     snap                 ask a board for a screen snapshot
+    profile start        a NeXTdimension board starts a clock profile of its
+                         i860 (Appendix C clocks per instruction address)
+    profile write FILE   ... writes it to FILE and stops
     grab                 save the screen Previous shows (the Cube's own, in
                          single-screen mode) as next_screen_NNN.png in the
                          snapshot directory (PREVIOUS_ND_SNAPSHOT)
@@ -48,15 +51,19 @@
 #define KEY_STEP_MS    30    /* between key and button transitions */
 #define POLL_MS        10    /* between looks at the file at its end */
 
-enum { A_WAIT, A_MOVE, A_DOWN, A_UP, A_KEYDOWN, A_KEYUP, A_SNAP, A_GRAB };
+enum { A_WAIT, A_MOVE, A_DOWN, A_UP, A_KEYDOWN, A_KEYUP, A_SNAP, A_GRAB, A_PROFILE };
 
 typedef struct {
     int     kind;
-    int     a, b;       /* move: dx, dy; button: right; key: modifiers, key */
+    int     a, b;       /* move: dx, dy; button: right; key: modifiers, key;
+                           profile: AUTOMATION_PROFILE_START or _WRITE */
     int64_t delay;      /* cycles after the action */
+    char*   text;       /* profile write: the file (allocated) */
 } Action;
 
 volatile int Automation_SnapshotRequest;
+volatile int Automation_ProfileRequest;
+char         Automation_ProfilePath[FILENAME_MAX];
 
 static FILE*   input;
 static Action* queue;
@@ -74,6 +81,7 @@ static void push(int kind, int a, int b, double delay_ms) {
     queue[qlen].a     = a;
     queue[qlen].b     = b;
     queue[qlen].delay = (int64_t)(delay_ms * cyclesPerMs);
+    queue[qlen].text  = NULL;
     qlen++;
 }
 
@@ -166,6 +174,16 @@ static void parse(char* line) {
         push(A_SNAP, 0, 0, 0);
     } else if (!strcmp(cmd, "grab")) {
         push(A_GRAB, 0, 0, 0);
+    } else if (!strcmp(cmd, "profile")) {
+        arg = strtok(NULL, " \t\r\n");
+        if (arg && !strcmp(arg, "start")) {
+            push(A_PROFILE, AUTOMATION_PROFILE_START, 0, 0);
+        } else if (arg && !strcmp(arg, "write") && (arg = strtok(NULL, "\r\n")) != NULL) {
+            push(A_PROFILE, AUTOMATION_PROFILE_WRITE, 0, 0);
+            queue[qlen - 1].text = strdup(arg);
+        } else {
+            Log_Printf(LOG_WARN, "[Automation] profile start | profile write FILE");
+        }
     } else {
         Log_Printf(LOG_WARN, "[Automation] unknown command '%s'", cmd);
     }
@@ -202,6 +220,13 @@ static void perform(const Action* a) {
         case A_KEYUP:   kms_keyup(a->a, a->b); break;
         case A_SNAP:    Automation_SnapshotRequest = 1; break;
         case A_GRAB:    grab(); break;
+        case A_PROFILE:
+            if (a->text) {
+                snprintf(Automation_ProfilePath, sizeof(Automation_ProfilePath), "%s", a->text);
+                free(a->text);
+            }
+            Automation_ProfileRequest = a->a;
+            break;
         default:        break;
     }
 }

@@ -290,6 +290,23 @@ void NDRustBoard::tick(int nHostCycles) {
         snapshot();
     }
 
+    /* "profile start" / "profile write FILE" (automation.c) */
+    if (Automation_ProfileRequest == AUTOMATION_PROFILE_START) {
+        Automation_ProfileRequest = 0;
+        if (nd_profile(board, 1) == ND_OK)
+            Log_Printf(LOG_WARN, "[ND] Slot %i: clock profile started", slot);
+        else
+            Log_Printf(LOG_WARN, "[ND] Slot %i: no clock profile on this board", slot);
+    } else if (Automation_ProfileRequest == AUTOMATION_PROFILE_WRITE) {
+        Automation_ProfileRequest = 0;
+        if (nd_profile_write(board, Automation_ProfilePath) == ND_OK)
+            Log_Printf(LOG_WARN, "[ND] Slot %i: clock profile written to %s", slot,
+                       Automation_ProfilePath);
+        else
+            Log_Printf(LOG_WARN, "[ND] Slot %i: clock profile not written", slot);
+        nd_profile(board, 0);
+    }
+
     /* The status bar LED: off when stopped, 1 in the ROM, 2 running */
     if (++ledTicks < 1024) return;
     ledTicks = 0;
