@@ -98,6 +98,35 @@ static nd_board* nd_rust_create(int* slot) {
     bool threaded = sync && !strcmp(sync, "threaded");
     c.sync    = threaded ? ND_SYNC_THREADED : ND_SYNC_LOCKSTEP;
     c.lag     = ND_LAG_HOST_WAITS;
+    /* PREVIOUS_ND_CPUS=2 or 4: a lab board of that many i860XPs
+     * (docs/emulation/i860-emulator-SBB-mp.md), not a NeXTdimension */
+    const char* cpus = getenv("PREVIOUS_ND_CPUS");
+    if (cpus && atoi(cpus) > 1) {
+        c.cpus   = (uint32_t)atoi(cpus);
+        c.flags |= ND_FLAG_XP;
+    }
+    /* PREVIOUS_ND_GDB_PORT=BASE: a GDB remote-protocol server for the board
+     * on 127.0.0.1:BASE+slot (LLDB: gdb-remote PORT); the i860 debugger
+     * shortcut stops the board for it */
+    const char* gdb = getenv("PREVIOUS_ND_GDB_PORT");
+    if (gdb && atoi(gdb) > 0) {
+        c.gdb_port = (uint16_t)(atoi(gdb) + *slot);
+    }
+    /* PREVIOUS_ND_EVENTS=FILE: the board's own events as JSON lines (traps,
+     * GINT, device registers, the debugger; nd_config.trace_path), %d in
+     * FILE replaced by the slot */
+    const char* events = getenv("PREVIOUS_ND_EVENTS");
+    char events_path[1024];
+    if (events) {
+        const char* d = strstr(events, "%d");
+        if (d) {
+            snprintf(events_path, sizeof events_path, "%.*s%d%s", (int)(d - events), events, *slot,
+                     d + 2);
+        } else {
+            snprintf(events_path, sizeof events_path, "%s", events);
+        }
+        c.trace_path = events_path;
+    }
     /* A larger screen than the NeXTdimension's, for NeXT's software patched
      * to draw it (nCore = 1 only) */
     c.vram_mb        = cfg->nVRAMSize;
@@ -113,6 +142,9 @@ static nd_board* nd_rust_create(int* slot) {
     } else {
         Log_Printf(LOG_WARN, "[ND] Slot %i: Rust board (nd_ffi ABI %u), %s, i860 at %.1f MHz", *slot,
                    nd_abi_version(), threaded ? "threaded" : "lockstep", c.i860_hz / 1e6);
+        if (c.gdb_port) {
+            Log_Printf(LOG_WARN, "[ND] Slot %i: GDB server on 127.0.0.1:%u", *slot, c.gdb_port);
+        }
     }
     return b;
 }
@@ -336,8 +368,16 @@ bool NDRustBoard::video_enabled(void) {
 }
 
 void NDRustBoard::debug_break(void) {
-    /* nd_ffi version 1 has no debugger: the board pauses until resumed */
-    Log_Printf(LOG_WARN, "[ND] Slot %i: paused for the debugger (resume to continue)", slot);
+    /* The board stops; with PREVIOUS_ND_GDB_PORT a GDB client attaches to
+     * it (and detaching resumes it), otherwise it stays paused until
+     * resumed */
+    const char* gdb = getenv("PREVIOUS_ND_GDB_PORT");
+    if (gdb && atoi(gdb) > 0) {
+        Log_Printf(LOG_WARN, "[ND] Slot %i: stopped for the debugger: gdb-remote %d", slot,
+                   atoi(gdb) + slot);
+    } else {
+        Log_Printf(LOG_WARN, "[ND] Slot %i: paused for the debugger (resume to continue)", slot);
+    }
     nd_debug_break(board);
 }
 
