@@ -534,6 +534,23 @@ static bool fpsr_check_arithmetic_exception(uae_u32 mask, fpdata *src, uae_u32 o
 				}
 				fpp_from_exten_fmovem(src, &fsave_data.et[0], &fsave_data.et[1], &fsave_data.et[2]);
 				fsave_data.stag = get_ftag(src, -1);
+				if (regs.fp_exp_pend == 51 || regs.fp_exp_pend == 53 || regs.fp_exp_pend == 49) { // UNFL, OVFL, INEX
+					// FMOVE to memory: FPTEMP holds the intermediate result, its
+					// mantissa rounded to the destination format for OVFL and
+					// unrounded otherwise (M68040UM Table 9-16). The FPSP's
+					// underflow and overflow handlers take the result from it.
+					eo = *src;
+					if (regs.fp_exp_pend == 53) {
+						if (size == 1)
+							fpp_round32(&eo);
+						else if (size == 5)
+							fpp_round64(&eo);
+						// Only flags of the rounding above: the instruction's
+						// are in the FPSR already.
+						fpp_clear_status();
+					}
+					fpp_from_exten_fmovem(&eo, &fsave_data.fpt[0], &fsave_data.fpt[1], &fsave_data.fpt[2]);
+				}
 			} else { // OPCLASS 000 and 010
 				fsave_data.cmdreg1b = extra;
 				fsave_data.e1 = 1;
@@ -1047,7 +1064,11 @@ static void fp_unimp_datatype(uae_u16 opcode, uae_u16 extra, uae_u32 ea, bool ea
 				fpp_from_exten_fmovem(src, &fsave_data.et[0], &fsave_data.et[1], &fsave_data.et[2]);
 				fsave_data.stag = get_ftag(src, (opclass == 0) ? 0xffffffff : size);
 				if (fsave_data.stag == 5) {
-					fsave_data.et[0] = (size == 1) ? 0x3f800000 : 0x3c000000; // exponent for denormalized single and double
+					// Denormalized single or double: the sign stays in bit 95, the
+					// exponent is zero and the fraction sits below the zero integer
+					// bit (M68040UM Figure 9-9). The FPSP takes the sign from here
+					// and writes the exponent itself (get_op.sa, src_sd_dnrm).
+					fsave_data.et[0] &= 0x80000000;
 				}
 				if (fp_is_dyadic(extra)) {
 					fpp_from_exten_fmovem(&regs.fp[reg], &fsave_data.fpt[0], &fsave_data.fpt[1], &fsave_data.fpt[2]);

@@ -3428,7 +3428,14 @@ floatx80 floatx80_denormalize( floatx80 a, flag eSign)
 	aExp = extractFloatx80Exp( a );
 	aSign = extractFloatx80Sign( a );
 	
-	if ( eSign ) {
+	/* eSign is a state frame's ETE15 or FPTE15 bit, bit 15 of the FPU's
+	   16-bit exponent. The FPSP sets it for every exponent up to $3FFF
+	   (get_op.sa, mk_norm) and reads the 15-bit exponent as negative only
+	   when its bit 14 is set too (res_func.sa: bfexts if the bit is set,
+	   else bfextu). Only a negative exponent, which the FPSP leaves when it
+	   normalizes a denormal (util.sa, nrm_set), needs denormalizing; a
+	   normalized single or double denormal keeps its exponent. */
+	if ( eSign && ( aExp & 0x4000 ) ) {
 		shiftCount = 0x8000 - aExp;
 		aExp = 0;
 		if (shiftCount > 63) {
