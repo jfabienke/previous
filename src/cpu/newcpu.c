@@ -7549,6 +7549,7 @@ void m68k_go (int may_quit)
 #endif
 			custom_reset (cpu_hardreset != 0, cpu_keyboardreset);
 			m68k_reset2 (cpu_hardreset != 0);
+			DebugCpu_SetDebugging();  /* m68k_reset2 cleared SPCFLAG_DEBUGGER */
 #ifndef WINUAE_FOR_PREVIOUS
 			if (cpu_hardreset) {
 				memory_clear ();
