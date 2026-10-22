@@ -2377,6 +2377,48 @@ void fpuop_bcc(uae_u32 opcode, uaecptr oldpc, uae_u32 extra)
 	}
 }
 
+/* An arithmetic exception that is pending when a 68040 FSAVE executes (the
+ * FPU has detected it but not yet reported it) belongs to the saved state:
+ * "Any exceptions generated during this time are not reported and are saved
+ * in the resulting busy state frame" (MC68040UM 9.8), and an FRESTORE of
+ * the frame reports it at the next floating-point instruction. The frame
+ * keeps it in the NMNEXC and NMCEXC bytes, the long word 44 bytes before the
+ * end of a busy or (revision $41) unimplemented instruction frame: reserved
+ * in MC68040UM Figure 9-10, named in the M68040FPSP's fpsp.h, whose
+ * gen_except clears them before restoring a frame it has completed. BSUN,
+ * INEX and DZ have no bit there and go in the long word's reserved low half.
+ * NeXTSTEP's context switch saves and restores the frame of a thread that
+ * an interrupt stopped between an FRESTORE that left an exception pending
+ * (the FPSP's completion of an instruction whose result underflows) and its
+ * next floating-point instruction; without this the exception, and with it
+ * the instruction's result, was lost. */
+static uae_u32 fsave_040_pending(int vector)
+{
+	switch (vector) {
+	case 54: return 0x01000000; /* SNAN: NMNEXC bit 0 */
+	case 52: return 0x00800000; /* OPERR: NMCEXC bit 7 */
+	case 53: return 0x00400000; /* OVFL: NMCEXC bit 6 */
+	case 51: return 0x00200000; /* UNFL: NMCEXC bit 5 */
+	case 48: case 49: case 50: return 0x00008000 | vector; /* BSUN, INEX, DZ */
+	default: return 0;
+	}
+}
+
+static int frestore_040_pending(uae_u32 v)
+{
+	if (v & 0x00008000)
+		return v & 0xff;
+	if (v & 0x01000000)
+		return 54;
+	if (v & 0x00800000)
+		return 52;
+	if (v & 0x00400000)
+		return 53;
+	if (v & 0x00200000)
+		return 51;
+	return 0;
+}
+
 void fpuop_save (uae_u32 opcode)
 {
 	uae_u32 ad, adp;
@@ -2495,7 +2537,7 @@ void fpuop_save (uae_u32 opcode)
 			if (fpu_version >= 0x41 || regs.fpu_exp_state == 2) {
 				x_cp_put_long(ad, fsave_data.cmdreg3b << 16); // CMDREG3B
 				ad += 4;
-				x_cp_put_long (ad, 0);
+				x_cp_put_long (ad, fsave_040_pending(regs.fp_exp_pend)); // NMNEXC, NMCEXC
 				ad += 4;
 			}
 			x_cp_put_long (ad, (fsave_data.stag << 29) | (fsave_data.wbtm66 << 26) | (fsave_data.grs << 23)); // STAG
@@ -2704,6 +2746,33 @@ retry:
 				
 				opclass = (cmdreg1b >> 13) & 0x7; // just to be sure
 				
+				if (cusavepc != 0xFE) {
+					/* a saved busy state: put it back, with any exception it holds */
+					uae_u32 b = ad_orig;
+					int vector = frestore_040_pending(x_cp_get_long(b + 0x38));
+					if (vector) {
+						fsave_data.wbt[0] = x_cp_get_long(b + 0x18);
+						fsave_data.wbt[1] = x_cp_get_long(b + 0x1c);
+						fsave_data.wbt[2] = x_cp_get_long(b + 0x20);
+						fsave_data.fpiarcu = x_cp_get_long(b + 0x28);
+						fsave_data.cmdreg3b = x_cp_get_long(b + 0x34) >> 16;
+						tmp = x_cp_get_long(b + 0x3c);
+						fsave_data.stag = tmp >> 29;
+						fsave_data.wbtm66 = (tmp >> 26) & 1;
+						fsave_data.grs = (tmp >> 23) & 7;
+						tmp = x_cp_get_long(b + 0x44);
+						fsave_data.dtag = tmp >> 29;
+						fsave_data.wbte15 = (tmp >> 20) & 1;
+						tmp = x_cp_get_long(b + 0x48);
+						fsave_data.e1 = (tmp >> 26) & 1;
+						fsave_data.e3 = (tmp >> 25) & 1;
+						fsave_data.t = (tmp >> 20) & 1;
+						regs.fpu_state = 1;
+						regs.fpu_exp_state = 2;
+						regs.fp_exp_pend = vector;
+					}
+				}
+
 				if (cusavepc == 0xFE) {
 					if (opclass == 0 || opclass == 2) {
 						fpp_to_exten_fmovem(&dst, fsave_data.fpt[0], fsave_data.fpt[1], fsave_data.fpt[2]);
@@ -2732,7 +2801,34 @@ retry:
 
 			} else if (frame_size == 0x30 || frame_size == 0x28) { // unimp
 
-				// TODO: restore frame contents
+				/* a saved unimplemented instruction state with an exception it holds
+				   (revision $41 frames only: $40's have no room for it) */
+				uae_u32 b = ad_orig, tmp;
+				int vector = frame_size == 0x30 ? frestore_040_pending(x_cp_get_long(b + 0x08)) : 0;
+				if (vector) {
+					fsave_data.cmdreg3b = x_cp_get_long(b + 0x04) >> 16;
+					tmp = x_cp_get_long(b + 0x0c);
+					fsave_data.stag = tmp >> 29;
+					fsave_data.wbtm66 = (tmp >> 26) & 1;
+					fsave_data.grs = (tmp >> 23) & 7;
+					fsave_data.cmdreg1b = x_cp_get_long(b + 0x10) >> 16;
+					tmp = x_cp_get_long(b + 0x14);
+					fsave_data.dtag = tmp >> 29;
+					fsave_data.wbte15 = (tmp >> 20) & 1;
+					tmp = x_cp_get_long(b + 0x18);
+					fsave_data.e1 = (tmp >> 26) & 1;
+					fsave_data.e3 = (tmp >> 25) & 1;
+					fsave_data.t = (tmp >> 20) & 1;
+					fsave_data.fpt[0] = x_cp_get_long(b + 0x1c);
+					fsave_data.fpt[1] = x_cp_get_long(b + 0x20);
+					fsave_data.fpt[2] = x_cp_get_long(b + 0x24);
+					fsave_data.et[0] = x_cp_get_long(b + 0x28);
+					fsave_data.et[1] = x_cp_get_long(b + 0x2c);
+					fsave_data.et[2] = x_cp_get_long(b + 0x30);
+					regs.fpu_state = 1;
+					regs.fpu_exp_state = 1;
+					regs.fp_exp_pend = vector;
+				}
 				ad += frame_size;
 
 			} else if (frame_size == 0x00) { // idle
