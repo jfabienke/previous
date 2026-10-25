@@ -61,6 +61,7 @@ int mmu060_state;
 uae_u16 mmu_opcode;
 bool mmu_restart;
 static bool locked_rmw_cycle;
+static bool locked_rmw_read;
 bool rmw_cycle;
 static bool ismoves;
 bool mmu_ttr_enabled, mmu_ttr_enabled_ins, mmu_ttr_enabled_data;
@@ -437,7 +438,9 @@ void mmu_bus_error(uaecptr addr, uae_u32 val, int fc, bool write, int size,uae_u
 			break;
 		}
 
-		regs.wb3_status = write ? 0x80 | (ssw & 0x7f) : 0;
+		/* The read of a locked transfer is checked as a write but has
+		 * nothing to write back: the instruction restarts. */
+		regs.wb3_status = (write && !locked_rmw_read) ? 0x80 | (ssw & 0x7f) : 0;
 		regs.wb3_data = val;
 		regs.wb2_status = 0;
 		if (!write)
@@ -533,6 +536,7 @@ void mmu_bus_error(uaecptr addr, uae_u32 val, int fc, bool write, int size,uae_u
 	ismoves = false;
 	rmw_cycle = false;
 	locked_rmw_cycle = false;
+	locked_rmw_read = false;
 	regs.mmu_fault_addr = addr;
 
 #if 0
@@ -1712,6 +1716,7 @@ uae_u32 uae_mmu_get_lrmw (uaecptr addr, int size, int type)
 {
 	uae_u32 v;
 	locked_rmw_cycle = true;
+	locked_rmw_read = true;
 	if (size == sz_byte) {
 		v = mmu_get_user_byte(addr, regs.s != 0, true, sz_byte, true);
 	} else if (size == sz_word) {
@@ -1727,6 +1732,7 @@ uae_u32 uae_mmu_get_lrmw (uaecptr addr, int size, int type)
 			v = mmu_get_user_long(addr, regs.s != 0, true, sz_long, true);
 	}
 	locked_rmw_cycle = false;
+	locked_rmw_read = false;
 	return v;
 }
 
