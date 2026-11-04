@@ -25,6 +25,14 @@ class NDSDL {
     SDL_Window*   ndWindow;
     SDL_Renderer* ndRenderer;
     SDL_Texture*  ndTexture;
+    /* PREVIOUS_ND_SNAPSHOT=DIR: the screen as DIR/nd-NNN.ppm every
+     * snapInterval m68k cycles (PREVIOUS_ND_SNAPSHOT_INTERVAL seconds, 10
+     * by default) and when automation's "snap" asks */
+    const char*   snapDir;
+    uint64_t      snapInterval;
+    uint64_t      snapNext;
+    int           snapCount;
+    void          snapshot(void);
 
 #ifdef ENABLE_RENDERING_THREAD
     volatile bool doRepaint;
@@ -42,6 +50,9 @@ public:
     void    destroy(void);
     void    resize(float scale);
     void    titlebar(bool show);
+    /* A snapshot if one is due, hostCycles m68k cycles after the board's
+     * start (m68k thread) */
+    void    snapshots(uint64_t hostCycles);
 };
 
 extern "C" {

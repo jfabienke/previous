@@ -157,6 +157,7 @@ public:
     volatile bool   video_vbl;
     
     NDSDL           sdl;
+    uint64_t        hostCycles;  /* m68k cycles since the board was made */
     i860_cpu_device i860;
     NBIC            nbic;
     MC              mc;

@@ -27,13 +27,6 @@ class NDRustBoard : public NDBoard {
     uint64_t  lastInstructions;
     uint64_t  lastHostTime;
     char      report[128];
-    /* PREVIOUS_ND_SNAPSHOT: the screen every snapInterval m68k cycles */
-    const char* snapDir;
-    uint64_t  snapInterval;
-    uint64_t  snapNext;
-    int       snapCount;
-
-    void      snapshot(void);
     /* PREVIOUS_ND_STATS: who works, every statsInterval m68k cycles */
     uint64_t  statsInterval;
     uint64_t  statsNext;

@@ -11,10 +11,15 @@
 #include "dimension.hpp"
 #include "sdlscreen.h"
 #include "screen.h"
+#include "log.h"
+#include "automation.h"
+
+#include <stdio.h>
+#include <stdlib.h>
 
 
 #ifdef ENABLE_RENDERING_THREAD
-NDSDL::NDSDL(int slot, uint32_t* vram) : slot(slot), vram(vram), width(NeXT_SCRN_W), height(NeXT_SCRN_H), pitch(NeXT_SCRN_W + 32), ndWindow(NULL), ndRenderer(NULL), ndTexture(NULL), doRepaint(true), repaintThread(NULL) {}
+NDSDL::NDSDL(int slot, uint32_t* vram) : slot(slot), vram(vram), width(NeXT_SCRN_W), height(NeXT_SCRN_H), pitch(NeXT_SCRN_W + 32), ndWindow(NULL), ndRenderer(NULL), ndTexture(NULL), snapDir(getenv("PREVIOUS_ND_SNAPSHOT")), snapInterval(0), snapNext(0), snapCount(0), doRepaint(true), repaintThread(NULL) {}
 
 int NDSDL::repainter(void *_this) {
     return ((NDSDL*)_this)->repainter();
@@ -34,7 +39,7 @@ int NDSDL::repainter(void) {
     return 0;
 }
 #else // !ENABLE_RENDERING_THREAD
-NDSDL::NDSDL(int slot, uint32_t* vram) : slot(slot), vram(vram), width(NeXT_SCRN_W), height(NeXT_SCRN_H), pitch(NeXT_SCRN_W + 32), ndWindow(NULL), ndRenderer(NULL), ndTexture(NULL) {}
+NDSDL::NDSDL(int slot, uint32_t* vram) : slot(slot), vram(vram), width(NeXT_SCRN_W), height(NeXT_SCRN_H), pitch(NeXT_SCRN_W + 32), ndWindow(NULL), ndRenderer(NULL), ndTexture(NULL), snapDir(getenv("PREVIOUS_ND_SNAPSHOT")), snapInterval(0), snapNext(0), snapCount(0) {}
 #endif // !ENABLE_RENDERING_THREAD
 
 /* A board whose screen is not the NeXTdimension's 1120 x 832 on 1152;
@@ -43,6 +48,48 @@ void NDSDL::geometry(int w, int h, int p) {
     width  = w;
     height = h;
     pitch  = p;
+}
+
+void NDSDL::snapshots(uint64_t hostCycles) {
+    if (!snapDir) return;
+    if (!snapInterval) {
+        const char* s = getenv("PREVIOUS_ND_SNAPSHOT_INTERVAL");
+        double secs = s ? atof(s) : 10.0;
+        snapInterval = (uint64_t)(secs * ConfigureParams.System.nCpuFreq * 1000000.0);
+        snapNext = hostCycles + snapInterval;
+    }
+    if (hostCycles >= snapNext || Automation_SnapshotRequest) {
+        Automation_SnapshotRequest = 0;
+        snapNext = hostCycles + snapInterval;
+        snapshot();
+    }
+}
+
+/* Write what the window shows, VRAM as it is blitted (bytes B, G, R, A),
+ * to PREVIOUS_ND_SNAPSHOT/nd-NNN.ppm. */
+void NDSDL::snapshot(void) {
+    char path[FILENAME_MAX];
+    const uint8_t* bytes = (const uint8_t*)vram;
+
+    snprintf(path, sizeof(path), "%s/nd-%03d.ppm", snapDir, snapCount++);
+    FILE* f = fopen(path, "wb");
+    if (!f) {
+        Log_Printf(LOG_WARN, "[ND] Slot %i: cannot write %s", slot, path);
+        return;
+    }
+    fprintf(f, "P6\n%d %d\n255\n", width, height);
+    uint8_t* line = (uint8_t*)malloc(width * 3);
+    for (int y = 0; y < height; y++) {
+        const uint8_t* src = bytes + (size_t)y * pitch * 4;
+        for (int x = 0; x < width; x++) {
+            line[3 * x + 0] = src[4 * x + 2];
+            line[3 * x + 1] = src[4 * x + 1];
+            line[3 * x + 2] = src[4 * x + 0];
+        }
+        fwrite(line, 3, width, f);
+    }
+    free(line);
+    fclose(f);
 }
 
 void NDSDL::repaint(void) {

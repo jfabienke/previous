@@ -14,7 +14,7 @@ extern "C" {
 
 extern void Automation_Init(void);
 extern void Automation_Run(int nHostCycles);
-/* Set by "snap", taken by a board that keeps snapshots (nd_rust.cpp) */
+/* Set by "snap", taken by a NeXTdimension that keeps snapshots (nd_sdl.cpp) */
 extern volatile int Automation_SnapshotRequest;
 /* Set by "profile start" and "profile write FILE" (the file in
  * Automation_ProfilePath), taken by a NeXTdimension board (nd_rust.cpp) */

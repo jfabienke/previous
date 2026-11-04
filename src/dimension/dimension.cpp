@@ -48,6 +48,7 @@ NextDimension::NextDimension(int slot) :
     display_vbl(false),
     video_vbl(false),
     sdl(slot, (uint32_t*)vram),
+    hostCycles(0),
     i860(this),
     nbic(slot, ND_NBIC_ID),
     mc(this),
@@ -89,6 +90,8 @@ void NextDimension::pause(bool pause) {
 
 /* Run the i860 on the m68k thread, unless it has a thread of its own */
 void NextDimension::tick(int nHostCycles) {
+    hostCycles += nHostCycles;
+    sdl.snapshots(hostCycles);
     if (i860.threaded()) return;
 
     handle_msgs();
