@@ -71,11 +71,17 @@ public:
     
     virtual void   reset(void);
     virtual void   pause(bool pause);
+
+    /* Whether accesses to the slot are NeXTbus transactions (a board in
+     * another slot), which the CPU waits for (nextbus_timing.c) */
+    virtual bool   on_nextbus(void) { return false; }
 };
 
 class NextBusBoard : public NextBusSlot {
 public:
     NextBusBoard(int slot);
+
+    virtual bool   on_nextbus(void) { return true; }
 };
 
 extern NextBusSlot* nextbus[];

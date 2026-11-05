@@ -374,6 +374,7 @@ typedef struct
   FPUTYPE n_FPUType;
   bool bCompatibleFPU;            /* More compatible FPU */
   bool bMMU;                      /* TRUE if MMU is enabled */
+  bool bNextBusTiming;            /* TRUE if the CPU waits for NeXTbus transactions */
 } CNF_SYSTEM;
 
 /* NeXT Dimension configuration */

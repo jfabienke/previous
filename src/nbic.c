@@ -31,6 +31,10 @@ struct {
 #define NBIC_CTRL_STFWD		0x08000000 /* Store forward */
 #define NBIC_CTRL_RMCOL		0x04000000 /* Read modify cycle collision */
 
+/* Whether software has written the control register: until then the
+ * power-up defaults apply (store-forward on, NBIC spec printed 4-5) */
+static bool nbic_control_written = false;
+
 /* ID: 0x02020004 (w), 0xF0FFFFFx (r), only non-Turbo */
 #define NBIC_ID_VALID		0x80000000
 #define NBIC_ID_M_MASK		0x7FFF0000 /* Manufacturer ID */
@@ -42,6 +46,11 @@ struct {
 /* Interrupt mask: 0xF0FFFFEC (rw) */
 #define NBIC_INT_MASK		0x80
 
+
+/* Store-forward: on at power-up, then as software sets it */
+bool nbic_store_forward(void) {
+	return !nbic_control_written || (nbic.control & NBIC_CTRL_STFWD) != 0;
+}
 
 /* Register access functions */
 static uint8_t nbic_control_read0(uint32_t addr) {
@@ -62,21 +71,25 @@ static uint8_t nbic_control_read3(uint32_t addr) {
 }
 
 static void nbic_control_write0(uint32_t addr, uint8_t val) {
+	nbic_control_written = true;
 	Log_Printf(LOG_NBIC_LEVEL, "[NBIC] Control (byte 0) write %02X at %08X",val,addr);
 	nbic.control &= 0x00FFFFFF;
 	nbic.control |= (uint32_t)val<<24;
 }
 static void nbic_control_write1(uint32_t addr, uint8_t val) {
+	nbic_control_written = true;
 	Log_Printf(LOG_NBIC_LEVEL, "[NBIC] Control (byte 1) write %02X at %08X",val,addr);
 	nbic.control &= 0xFF00FFFF;
 	nbic.control |= val<<16;
 }
 static void nbic_control_write2(uint32_t addr, uint8_t val) {
+	nbic_control_written = true;
 	Log_Printf(LOG_NBIC_LEVEL, "[NBIC] Control (byte 2) write %02X at %08X",val,addr);
 	nbic.control &= 0xFFFF00FF;
 	nbic.control |= val<<8;
 }
 static void nbic_control_write3(uint32_t addr, uint8_t val) {
+	nbic_control_written = true;
 	Log_Printf(LOG_NBIC_LEVEL, "[NBIC] Control (byte 3) write %02X at %08X",val,addr);
 	nbic.control &= 0xFFFFFF00;
 	nbic.control |= val;

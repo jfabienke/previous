@@ -47,6 +47,7 @@
 #include "dsp.h"
 #include "dimension.hpp"
 #include "automation.h"
+#include "nextbus_timing.h"
 #include "sysReg.h"
 #include "debugcpu.h"
 #endif
@@ -5129,6 +5130,10 @@ static void debug_cpu_stop(void)
 static inline void run_other_MPUs(void)
 {
 	static int ndCycles = 0;
+
+	/* the time the instruction waited for the NeXTbus */
+	if (NextBusTiming_Enabled)
+		cpu_cycles += NextBusTiming_TakeStall();
 
 	ndCycles += cpu_cycles;
 	// bundle some 68k cycles for MPUs
