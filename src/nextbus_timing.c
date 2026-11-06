@@ -190,7 +190,8 @@ void NextBusTiming_Access(int slot, int size, bool write_access) {
 		n_reads++;
 		spent = bus_read(slot & 15, burst, t);
 	}
-	double table = p.table_ns[size] * (burst ? 4 : 1);
+	/* the core charges a MOVE16 about one clock in all, not four accesses */
+	double table = burst ? 0 : p.table_ns[size];
 	if (spent > table) {
 		stall_ns += spent - table;
 		waited_ns += spent - table;
@@ -210,6 +211,9 @@ void NextBusTiming_BurstEnd(void) {
 }
 
 int NextBusTiming_TakeStall(void) {
+	/* a MOVE16's accesses are one instruction's: a bus error inside one
+	 * must not leave the rest of its burst to later accesses */
+	burst_left = 0;
 	if (stall_ns < p.cpu_ns) {
 		return 0;
 	}
