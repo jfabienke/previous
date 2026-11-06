@@ -103,7 +103,7 @@ static void push_key(int mods, SDL_Scancode sc) {
 
 /* US layout: the scancode and shift for a character */
 static SDL_Scancode char_scancode(char c, int* shift) {
-    static const char* plain   = "`1234567890-=[]\;',./";
+    static const char* plain   = "`1234567890-=[]\\;',./";
     static const char* shifted = "~!@#$%^&*()_+{}|:\"<>?";
     static const SDL_Scancode codes[] = {
         SDL_SCANCODE_GRAVE, SDL_SCANCODE_1, SDL_SCANCODE_2, SDL_SCANCODE_3, SDL_SCANCODE_4,
