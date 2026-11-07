@@ -12,6 +12,7 @@ const char Nbic_fileid[] = "Previous nbic.c";
 #include "configuration.h"
 #include "m68000.h"
 #include "nbic.h"
+#include "nextbus_rust.h"
 
 #define LOG_NEXTBUS_LEVEL   LOG_NONE
 
@@ -49,7 +50,35 @@ static bool nbic_control_written = false;
 
 /* Store-forward: on at power-up, then as software sets it */
 bool nbic_store_forward(void) {
+	if (NextBusRust_Registers_Available())
+		return NextBusRust_StoreForward();
 	return !nbic_control_written || (nbic.control & NBIC_CTRL_STFWD) != 0;
+}
+
+/* With the Rust NeXTbus model the registers are the model's: register
+ * accesses (NCS*) are bus cycles it times, and bad accesses are bus errors
+ * (here they used to abort Previous). */
+static uae_u32 rust_get(uaecptr addr, int size, bool slot_space) {
+	uint32_t offset = slot_space ? (addr & 0x00FFFFFF) : (addr & 0x0000FFFF);
+	uint32_t val = 0;
+	if (!slot_space && NextBus_TimingMode == NEXTBUS_TIMING_CYCLE)
+		NextBusRust_Registers(offset, size, false);
+	if (NextBusRust_RegRead(slot_space, offset, size, &val)) {
+		Log_Printf(LOG_WARN, "[NBIC] bus error read at %08X", addr);
+		M68000_BusError(addr, BUS_ERROR_READ, size, BUS_ERROR_ACCESS_DATA, 0);
+		return 0;
+	}
+	return val;
+}
+
+static void rust_put(uaecptr addr, int size, uae_u32 val, bool slot_space) {
+	uint32_t offset = slot_space ? (addr & 0x00FFFFFF) : (addr & 0x0000FFFF);
+	if (!slot_space && NextBus_TimingMode == NEXTBUS_TIMING_CYCLE)
+		NextBusRust_Registers(offset, size, true);
+	if (NextBusRust_RegWrite(slot_space, offset, size, val)) {
+		Log_Printf(LOG_WARN, "[NBIC] bus error write at %08X", addr);
+		M68000_BusError(addr, BUS_ERROR_WRITE, size, BUS_ERROR_ACCESS_DATA, val);
+	}
 }
 
 /* Register access functions */
@@ -180,6 +209,9 @@ static void (*nbic_write_reg[8])(uint32_t, uint8_t) = {
 
 
 uae_u32 nbic_reg_lget(uaecptr addr) {
+	if (NextBusRust_Registers_Available()) {
+		return rust_get(addr, 4, false);
+	}
 	uae_u32 val = 0;
 	
 	if (addr&3) {
@@ -200,6 +232,9 @@ uae_u32 nbic_reg_lget(uaecptr addr) {
 }
 
 uae_u32 nbic_reg_wget(uaecptr addr) {
+	if (NextBusRust_Registers_Available()) {
+		return rust_get(addr, 2, false);
+	}
 	uae_u32 val = 0;
 	
 	if (addr&1) {
@@ -218,6 +253,9 @@ uae_u32 nbic_reg_wget(uaecptr addr) {
 }
 
 uae_u32 nbic_reg_bget(uaecptr addr) {
+	if (NextBusRust_Registers_Available()) {
+		return rust_get(addr, 1, false);
+	}
 	if ((addr&0x0000FFFF)>7) {
 		return nbic_bus_error_read(addr);
 	} else {
@@ -226,6 +264,10 @@ uae_u32 nbic_reg_bget(uaecptr addr) {
 }
 
 void nbic_reg_lput(uaecptr addr, uae_u32 l) {
+	if (NextBusRust_Registers_Available()) {
+		rust_put(addr, 4, l, false);
+		return;
+	}
 	if (addr&3) {
 		Log_Printf(LOG_WARN, "[NBIC] Unaligned access at %08X.",addr);
 		abort();
@@ -242,6 +284,10 @@ void nbic_reg_lput(uaecptr addr, uae_u32 l) {
 }
 
 void nbic_reg_wput(uaecptr addr, uae_u32 w) {
+	if (NextBusRust_Registers_Available()) {
+		rust_put(addr, 2, w, false);
+		return;
+	}
 	if (addr&1) {
 		Log_Printf(LOG_WARN, "[NBIC] Unaligned access at %08X.",addr);
 		abort();
@@ -256,6 +302,10 @@ void nbic_reg_wput(uaecptr addr, uae_u32 w) {
 }
 
 void nbic_reg_bput(uaecptr addr, uae_u32 b) {
+	if (NextBusRust_Registers_Available()) {
+		rust_put(addr, 1, b, false);
+		return;
+	}
 	if ((addr&0x0000FFFF)>7) {
 		nbic_bus_error_write(addr,0);
 	} else {
@@ -290,6 +340,9 @@ static void (*nbic_write_cpu_slot[32])(uint32_t, uint8_t) = {
 };
 
 uint32_t nb_cpu_slot_lget(uint32_t addr) {
+	if (NextBusRust_Registers_Available()) {
+		return rust_get(addr, 4, true);
+	}
     uint32_t val = 0;
     
     if (addr&3) {
@@ -310,6 +363,9 @@ uint32_t nb_cpu_slot_lget(uint32_t addr) {
 }
 
 uint16_t nb_cpu_slot_wget(uint32_t addr) {
+	if (NextBusRust_Registers_Available()) {
+		return (uint16_t)rust_get(addr, 2, true);
+	}
     uint32_t val = 0;
     
     if (addr&1) {
@@ -328,6 +384,9 @@ uint16_t nb_cpu_slot_wget(uint32_t addr) {
 }
 
 uint8_t nb_cpu_slot_bget(uint32_t addr) {
+	if (NextBusRust_Registers_Available()) {
+		return (uint8_t)rust_get(addr, 1, true);
+	}
     if ((addr&0x00FFFFFF)<0x00FFFFE8) {
         return nbic_bus_error_read(addr);
     } else {
@@ -336,6 +395,10 @@ uint8_t nb_cpu_slot_bget(uint32_t addr) {
 }
 
 void nb_cpu_slot_lput(uint32_t addr, uint32_t l) {
+	if (NextBusRust_Registers_Available()) {
+		rust_put(addr, 4, l, true);
+		return;
+	}
     if (addr&3) {
         Log_Printf(LOG_WARN, "[NBIC] Unaligned access at %08X.",addr);
         abort();
@@ -352,6 +415,10 @@ void nb_cpu_slot_lput(uint32_t addr, uint32_t l) {
 }
 
 void nb_cpu_slot_wput(uint32_t addr, uint16_t w) {
+	if (NextBusRust_Registers_Available()) {
+		rust_put(addr, 2, w, true);
+		return;
+	}
     if (addr&1) {
         Log_Printf(LOG_WARN, "[NBIC] Unaligned access at %08X.",addr);
         abort();
@@ -366,6 +433,10 @@ void nb_cpu_slot_wput(uint32_t addr, uint16_t w) {
 }
 
 void nb_cpu_slot_bput(uint32_t addr, uint8_t b) {
+	if (NextBusRust_Registers_Available()) {
+		rust_put(addr, 1, b, true);
+		return;
+	}
     if ((addr&0x00FFFFFF)<0x00FFFFE8) {
         nbic_bus_error_write(addr,0);
     } else {

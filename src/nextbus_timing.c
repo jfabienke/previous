@@ -26,7 +26,7 @@
     (NBIC 6-6 to 6-9).
   The board's LCLK, its memory controller's wait states and whether it takes
   bursts are not documented, so they are settings:
-    PREVIOUS_NEXTBUS_TIMING  0 or 1, over the configuration's bNextBusTiming
+    PREVIOUS_NEXTBUS_TIMING  2 selects this model (nextbus_rust.c chooses)
     PREVIOUS_NEXTBUS_LCLK    the board's local clock in MHz (16.5)
     PREVIOUS_NEXTBUS_WAITS   the board's wait states a transaction, in LCLK (0)
     PREVIOUS_NEXTBUS_BURSTS  1 if the board takes four-word bursts (1)
@@ -47,6 +47,7 @@ const char NextBusTiming_fileid[] = "Previous nextbus_timing.c";
 #include "m68000.h"
 #include "nbic.h"
 #include "nextbus_timing.h"
+#include "nextbus_rust.h"
 
 #define MAX_POSTED 8
 
@@ -223,7 +224,8 @@ int NextBusTiming_TakeStall(void) {
 }
 
 void NextBusTiming_Reset(void) {
-	int on = setting("PREVIOUS_NEXTBUS_TIMING", ConfigureParams.System.bNextBusTiming ? 1 : 0);
+	/* nextbus_rust.c chooses the mode */
+	int on = NextBus_TimingMode == NEXTBUS_TIMING_INTERIM;
 	int mhz = ConfigureParams.System.nCpuFreq > 0 ? ConfigureParams.System.nCpuFreq : 25;
 	const char* lclk = getenv("PREVIOUS_NEXTBUS_LCLK");
 	double lclk_mhz = lclk && *lclk ? atof(lclk) : 16.5;

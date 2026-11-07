@@ -39,6 +39,7 @@ const char Main_fileid[] = "Previous main.c";
 
 #include "hatari-glue.h"
 #include "NextBus.hpp"
+#include "nextbus_rust.h"
 
 #ifdef WIN32
 #include "gui-win/opencon.h"
@@ -372,6 +373,7 @@ static void Main_UnInit(void) {
 	IoMem_UnInit();
 	UI_UnInit();
 	Exit680x0();
+	NextBusRust_Exit();
 
 	/* Close debug log file */
 	DebugUI_UnInit();

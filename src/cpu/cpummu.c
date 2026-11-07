@@ -38,6 +38,7 @@
 #include "debug.h"
 #include "log.h"
 #include "nextbus_timing.h"
+#include "nextbus_rust.h"
 
 #define MMUDUMP 1
 
@@ -1370,7 +1371,13 @@ void mmu_get_move16(uaecptr addr, uae_u32 *v, bool data, int size)
 	}
 	// MOVE16 read and cache miss: do not allocate new cache line
 	mmu_cache_state |= CACHE_DISABLE_ALLOCATE;
-	NextBusTiming_BurstBegin();
+	if (NextBus_TimingMode == NEXTBUS_TIMING_CYCLE && NextBusRust_InSpace(addr)) {
+		/* one line transfer; its four long words are then free */
+		if (NextBusRust_Line(addr, false))
+			hardware_exception2(addr, 0, true, false, sz_long);
+	} else {
+		NextBusTiming_BurstBegin();
+	}
 	for (int i = 0; i < 4; i++) {
 		v[i] = x_phys_get_long(addr + i * 4);
 	}
@@ -1387,7 +1394,12 @@ void mmu_put_move16(uaecptr addr, uae_u32 *val, bool data, int size)
 	}
 	// MOVE16 write invalidates existing line and also does not allocate new cache lines.
 	mmu_cache_state = CACHE_DISABLE_MMU;
-	NextBusTiming_BurstBegin();
+	if (NextBus_TimingMode == NEXTBUS_TIMING_CYCLE && NextBusRust_InSpace(addr)) {
+		if (NextBusRust_Line(addr, true))
+			hardware_exception2(addr, val[0], false, false, sz_long);
+	} else {
+		NextBusTiming_BurstBegin();
+	}
 	for (int i = 0; i < 4; i++) {
 		x_phys_put_long(addr + i * 4, val[i]);
 	}

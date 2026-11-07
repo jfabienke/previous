@@ -48,6 +48,7 @@
 #include "dimension.hpp"
 #include "automation.h"
 #include "nextbus_timing.h"
+#include "nextbus_rust.h"
 #include "sysReg.h"
 #include "debugcpu.h"
 #endif
@@ -5134,6 +5135,8 @@ static inline void run_other_MPUs(void)
 	/* the time the instruction waited for the NeXTbus */
 	if (NextBusTiming_Enabled)
 		cpu_cycles += NextBusTiming_TakeStall();
+	else if (NextBusRust_Touched)
+		cpu_cycles = NextBusRust_EndInstruction(cpu_cycles);
 
 	ndCycles += cpu_cycles;
 	// bundle some 68k cycles for MPUs

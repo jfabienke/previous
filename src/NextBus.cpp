@@ -11,6 +11,7 @@
 #include "nbic.h"
 #include "dimension.hpp"
 #include "nextbus_timing.h"
+#include "nextbus_rust.h"
 #ifdef ENABLE_ND_RUST
 #include "nd_rust.hpp"
 #endif
@@ -60,10 +61,29 @@ public:
     virtual bool   on_nextbus(void) {return false;}
 };
 
-/* An access to a board across the NeXTbus costs the CPU the bus's time. */
-static inline void bus_time(int slot, int size, bool write) {
-    if (NextBusTiming_Enabled && nextbus[slot]->on_nextbus()) {
-        NextBusTiming_Access(slot, size, write);
+/* An access to a board across the NeXTbus costs the CPU the bus's time.
+ * Returns whether the slot's handler is to make the access: with the cycle
+ * model, a read the bus answers with an error (an empty slot's timeout)
+ * raises it here, and a write to an empty slot is posted and lost. */
+static inline bool bus_time(uaecptr addr, int slot, int size, bool write, uint32_t val) {
+    switch (NextBus_TimingMode) {
+    case NEXTBUS_TIMING_INTERIM:
+        if (nextbus[slot]->on_nextbus()) {
+            NextBusTiming_Access(slot, size, write);
+        }
+        return true;
+    case NEXTBUS_TIMING_CYCLE:
+        if (!NextBusRust_InSpace(addr)) {
+            return true;
+        }
+        if (NextBusRust_Access(addr, size, write)) {
+            M68000_BusError(addr, write ? BUS_ERROR_WRITE : BUS_ERROR_READ, size,
+                            BUS_ERROR_ACCESS_DATA, val);
+            return false;
+        }
+        return !write || nextbus[slot]->on_nextbus();
+    default:
+        return true;
     }
 }
 
@@ -93,7 +113,9 @@ extern "C" {
     /* Slot memory */
     uae_u32 nextbus_slot_lget(uaecptr addr) {
         int slot = SLOT(addr);
-        bus_time(slot, 4, false);
+        if (!bus_time(addr, slot, 4, false, 0)) {
+            return 0;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Slot %i: lget at %08X",slot,addr);
         
         return nextbus[slot]->slot_lget(addr);
@@ -101,7 +123,9 @@ extern "C" {
     
     uae_u32 nextbus_slot_wget(uaecptr addr) {
         int slot = SLOT(addr);
-        bus_time(slot, 2, false);
+        if (!bus_time(addr, slot, 2, false, 0)) {
+            return 0;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Slot %i: wget at %08X",slot,addr);
         
         return nextbus[slot]->slot_wget(addr);
@@ -109,7 +133,9 @@ extern "C" {
     
     uae_u32 nextbus_slot_bget(uaecptr addr) {
         int slot = SLOT(addr);
-        bus_time(slot, 1, false);
+        if (!bus_time(addr, slot, 1, false, 0)) {
+            return 0;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Slot %i: bget at %08X",slot,addr);
         
         return nextbus[slot]->slot_bget(addr);
@@ -117,7 +143,9 @@ extern "C" {
     
     void nextbus_slot_lput(uaecptr addr, uae_u32 val) {
         int slot = SLOT(addr);
-        bus_time(slot, 4, true);
+        if (!bus_time(addr, slot, 4, true, val)) {
+            return;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Slot %i: lput at %08X, val %08X",slot,addr,val);
         
         nextbus[slot]->slot_lput(addr, val);
@@ -125,7 +153,9 @@ extern "C" {
     
     void nextbus_slot_wput(uaecptr addr, uae_u32 val) {
         int slot = SLOT(addr);
-        bus_time(slot, 2, true);
+        if (!bus_time(addr, slot, 2, true, val)) {
+            return;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Slot %i: wput at %08X, val %04X",slot,addr,val);
         
         nextbus[slot]->slot_wput(addr, val);
@@ -133,7 +163,9 @@ extern "C" {
     
     void nextbus_slot_bput(uaecptr addr, uae_u32 val) {
         int slot = SLOT(addr);
-        bus_time(slot, 1, true);
+        if (!bus_time(addr, slot, 1, true, val)) {
+            return;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Slot %i: bput at %08X, val %02X",slot,addr,val);
         
         nextbus[slot]->slot_bput(addr, val);
@@ -143,7 +175,9 @@ extern "C" {
 
     uae_u32 nextbus_board_lget(uaecptr addr) {
         int board = BOARD(addr);
-        bus_time(board, 4, false);
+        if (!bus_time(addr, board, 4, false, 0)) {
+            return 0;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Board %i: lget at %08X",board,addr);
         
         return nextbus[board]->board_lget(addr);
@@ -151,7 +185,9 @@ extern "C" {
     
     uae_u32 nextbus_board_wget(uaecptr addr) {
         int board = BOARD(addr);
-        bus_time(board, 2, false);
+        if (!bus_time(addr, board, 2, false, 0)) {
+            return 0;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Board %i: wget at %08X",board,addr);
         
         return nextbus[board]->board_wget(addr);
@@ -159,7 +195,9 @@ extern "C" {
     
     uae_u32 nextbus_board_bget(uaecptr addr) {
         int board = BOARD(addr);
-        bus_time(board, 1, false);
+        if (!bus_time(addr, board, 1, false, 0)) {
+            return 0;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Board %i: bget at %08X",board,addr);
         
         return nextbus[board]->board_bget(addr);
@@ -167,7 +205,9 @@ extern "C" {
     
     void nextbus_board_lput(uaecptr addr, uae_u32 val) {
         int board = BOARD(addr);
-        bus_time(board, 4, true);
+        if (!bus_time(addr, board, 4, true, val)) {
+            return;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Board %i: lput at %08X, val %08X",board,addr,val);
         
         nextbus[board]->board_lput(addr, val);
@@ -175,7 +215,9 @@ extern "C" {
     
     void nextbus_board_wput(uaecptr addr, uae_u32 val) {
         int board = BOARD(addr);
-        bus_time(board, 2, true);
+        if (!bus_time(addr, board, 2, true, val)) {
+            return;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Board %i: wput at %08X, val %04X",board,addr,val);
         
         nextbus[board]->board_wput(addr, val);
@@ -183,7 +225,9 @@ extern "C" {
     
     void nextbus_board_bput(uaecptr addr, uae_u32 val) {
         int board = BOARD(addr);
-        bus_time(board, 1, true);
+        if (!bus_time(addr, board, 1, true, val)) {
+            return;
+        }
         Log_Printf(LOG_NEXTBUS_LEVEL, "[NextBus] Board %i: bput at %08X, val %02X",board,addr,val);
         
         nextbus[board]->board_bput(addr, val);
@@ -216,6 +260,12 @@ extern "C" {
                 insert_board(new NextDimension(ND_SLOT(i)));
             }
         }
+        NextBusRust_Init();
+        for (int slot = 1; slot < 16; slot++) {
+            if (nextbus[slot]->on_nextbus()) {
+                NextBusRust_Attach(slot);
+            }
+        }
         NextBusTiming_Reset();
     }
     
@@ -228,6 +278,7 @@ extern "C" {
     void NextBus_Reset(void) {
         for(int slot = 0; slot < 16; slot++)
             nextbus[slot]->reset();
+        NextBusRust_Reset();
         NextBusTiming_Reset();
     }
     
