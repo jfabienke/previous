@@ -59,6 +59,7 @@ public:
 
     virtual void     reset(void);
     virtual void     pause(bool pause);
+    virtual bool     attach_nextbus(void);
 
     virtual NDSDL&      display(void) { return sdl; }
     virtual void        tick(int nHostCycles);

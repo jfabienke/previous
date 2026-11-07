@@ -18,6 +18,7 @@
 #include "dimension.hpp"
 #include "nd_rust.hpp"
 #include "automation.h"
+#include "nextbus_rust.h"
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -190,7 +191,20 @@ NDRustBoard::NDRustBoard(int slot) :
 NDRustBoard::~NDRustBoard() {
     Statusbar_SetNdLed(0);
     sdl.destroy();
+    NextBusRust_DetachBoard(slot);
     nd_destroy(board);
+}
+
+/* PREVIOUS_ND_SYNC=threaded: the board runs on a thread of its own. */
+static bool nd_rust_threaded(void) {
+    const char* sync = getenv("PREVIOUS_ND_SYNC");
+    return sync && !strcmp(sync, "threaded");
+}
+
+/* The NeXTbus model moves this board's data, at the times it gives
+ * (nextbus_rust.c, PREVIOUS_NEXTBUS_DATA). */
+bool NDRustBoard::attach_nextbus(void) {
+    return board && NextBusRust_AttachBoard(slot, board, nd_rust_threaded());
 }
 
 /* Board space reaches the board at 0xF and the low 28 bits: VRAM is
@@ -208,6 +222,16 @@ uint32_t NDRustBoard::read(int space, uint32_t addr, int size) {
         if (nd_host_vram(space, addr)) statsVramRead += size;
     }
 
+    if (NextBusRust_HasData(slot)) {
+        /* timed and moved by the NeXTbus model; a read may run the board */
+        int rc = NextBusRust_AccessData(addr, size, false, &val);
+        nd_update_gint();
+        if (rc == 1) {
+            M68000_BusError(addr, BUS_ERROR_READ, size, BUS_ERROR_ACCESS_DATA, 0);
+        }
+        nd_trace_access(slot, space, false, addr, size, val);
+        return val;
+    }
     if (!board || nd_host_read(board, space, addr, size, &val) == ND_BUS_ERROR) {
         M68000_BusError(addr, BUS_ERROR_READ, size, BUS_ERROR_ACCESS_DATA, 0);
     }
@@ -221,6 +245,14 @@ void NDRustBoard::write(int space, uint32_t addr, int size, uint32_t val) {
         if (nd_host_vram(space, addr)) statsVramWritten += size;
     }
     nd_trace_access(slot, space, true, addr, size, val);
+    if (NextBusRust_HasData(slot)) {
+        int rc = NextBusRust_AccessData(addr, size, true, &val);
+        nd_update_gint();
+        if (rc == 1) {
+            M68000_BusError(addr, BUS_ERROR_WRITE, size, BUS_ERROR_ACCESS_DATA, val);
+        }
+        return;
+    }
     if (!board || nd_host_write(board, space, addr, size, val) == ND_BUS_ERROR) {
         M68000_BusError(addr, BUS_ERROR_WRITE, size, BUS_ERROR_ACCESS_DATA, val);
     }
@@ -270,7 +302,12 @@ void NDRustBoard::stats(void) {
 
 void NDRustBoard::tick(int nHostCycles) {
     hostCycles += nHostCycles;
-    nd_advance(board, hostCycles);
+    if (NextBusRust_AdvancesBoard(slot)) {
+        /* on the NeXTbus model's time base, the 68040's clock since reset */
+        NextBusRust_Advance();
+    } else {
+        nd_advance(board, hostCycles);
+    }
 
     if (statsInterval && hostCycles >= statsNext) {
         statsNext = hostCycles + statsInterval;

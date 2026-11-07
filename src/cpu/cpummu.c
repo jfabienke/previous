@@ -1373,7 +1373,7 @@ void mmu_get_move16(uaecptr addr, uae_u32 *v, bool data, int size)
 	mmu_cache_state |= CACHE_DISABLE_ALLOCATE;
 	if (NextBus_TimingMode == NEXTBUS_TIMING_CYCLE && NextBusRust_InSpace(addr)) {
 		/* one line transfer; its four long words are then free */
-		if (NextBusRust_Line(addr, false))
+		if (NextBusRust_Line(addr, false, v))
 			hardware_exception2(addr, 0, true, false, sz_long);
 	} else {
 		NextBusTiming_BurstBegin();
@@ -1395,7 +1395,7 @@ void mmu_put_move16(uaecptr addr, uae_u32 *val, bool data, int size)
 	// MOVE16 write invalidates existing line and also does not allocate new cache lines.
 	mmu_cache_state = CACHE_DISABLE_MMU;
 	if (NextBus_TimingMode == NEXTBUS_TIMING_CYCLE && NextBusRust_InSpace(addr)) {
-		if (NextBusRust_Line(addr, true))
+		if (NextBusRust_Line(addr, true, val))
 			hardware_exception2(addr, val[0], false, false, sz_long);
 	} else {
 		NextBusTiming_BurstBegin();

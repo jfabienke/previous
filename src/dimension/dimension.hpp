@@ -25,6 +25,8 @@ extern "C" {
     typedef void (*i860_run_func)(int);
     extern i860_run_func i860_Run;
     extern void        nd_run_boards(int nHostCycles);
+    /* Raise or release the m68k's remote interrupt from the boards' GINT* */
+    extern void        nd_update_gint(void);
 
     extern void        ND_VBL_Handler(void);
     extern void        ND_Video_VBL_Handler(void);

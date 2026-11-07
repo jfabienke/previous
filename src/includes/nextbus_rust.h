@@ -43,8 +43,24 @@ extern bool NextBusRust_InSpace(uint32_t addr);
 /* One access by the running instruction: 0, or 1 when the 68040 takes a
  * bus error (after the time it waited). */
 extern int NextBusRust_Access(uint32_t addr, int size, bool write);
-/* A MOVE16 line at addr; its four long words then cost nothing more. */
-extern int NextBusRust_Line(uint32_t addr, bool write);
+/* A MOVE16 line at addr; its four long words then cost nothing more. For
+ * a board attached with its data, data holds a write's words and gets a
+ * read's (the four long-word accesses then read them). */
+extern int NextBusRust_Line(uint32_t addr, bool write, uint32_t* data);
+
+/* A Rust ND board (nd_board*) in slot, attached so that its accesses move
+ * their data through the model (PREVIOUS_NEXTBUS_DATA, on by default):
+ * false if it is not (then the board moves its own data). */
+extern bool NextBusRust_AttachBoard(int slot, void* board, bool threaded);
+extern void NextBusRust_DetachBoard(int slot);
+/* The board in slot is attached with its data; and run by the model. */
+extern bool NextBusRust_HasData(int slot);
+extern bool NextBusRust_AdvancesBoard(int slot);
+/* Run the attached lockstep boards to the current instruction's start. */
+extern void NextBusRust_Advance(void);
+/* An access to an attached board by the running instruction, with its
+ * data: 0, 1 for a bus error, 2 if the board faulted (reads give 0). */
+extern int NextBusRust_AccessData(uint32_t addr, int size, bool write, uint32_t* val);
 /* The bus cycle of an access to the CPU board NBIC's registers (NCS*). */
 extern void NextBusRust_Registers(uint32_t offset, int size, bool write);
 /* The running instruction ends: the cycles to charge it instead. */

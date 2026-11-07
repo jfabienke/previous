@@ -28,6 +28,12 @@
     PREVIOUS_NEXTBUS_BURSTS   0: boards refuse bursts (1)
     PREVIOUS_NEXTBUS_SYNC     flip-flops between MCLK and a local clock (2)
     PREVIOUS_NEXTBUS_TIMEOUT  acknowledge cycle of an unanswered transaction (256)
+    PREVIOUS_NEXTBUS_DATA     0: the Rust ND board moves its own data, timed
+                              by a stand-in (phase 2). Otherwise its accesses
+                              move their data through the model: the i860
+                              gives up its bus for them, host writes take
+                              effect at their board time, and the model runs
+                              the board on its time base (1)
 
   Telemetry:
     PREVIOUS_NEXTBUS_STATS    seconds of guest time between log lines
@@ -91,6 +97,9 @@ static int timing_mode(void) {
 static nd_bus* bus;
 static uint64_t stats_interval, stats_next;
 static nd_bus_stats stats_last;
+/* Slots whose board moves its data through the model; of those, the ones
+ * the model runs (lockstep). */
+static bool data_slot[16], run_slot[16];
 
 void NextBusRust_Init(void) {
 	NextBus_TimingMode = timing_mode();
@@ -165,6 +174,8 @@ void NextBusRust_Reset(void) {
 void NextBusRust_Exit(void) {
 	if (!bus)
 		return;
+	for (int slot = 0; slot < 16; slot++)
+		data_slot[slot] = run_slot[slot] = false;
 	const char* profile = getenv("PREVIOUS_NEXTBUS_PROFILE");
 	if (profile && *profile && nd_bus_profile_write(bus, profile) != ND_OK)
 		Log_Printf(LOG_ERROR, "[NextBus] profile: %s", nd_last_error());
@@ -183,12 +194,70 @@ int NextBusRust_Access(uint32_t addr, int size, bool write) {
 	                     write ? ND_BUS_WRITE : 0) == ND_BUS_ERROR;
 }
 
-int NextBusRust_Line(uint32_t addr, bool write) {
+int NextBusRust_Line(uint32_t addr, bool write, uint32_t* data) {
 	if (!bus)
 		return 0;
 	NextBusRust_Touched = true;
+	int slot = addr >> 28 == 0xF ? (addr >> 24) & 0xF : addr >> 28;
+	if (data_slot[slot] && data)
+		return nd_bus_line_data(bus, nCyclesMainCounter, regs.instruction_pc, addr,
+		                        write ? ND_BUS_WRITE : 0, data) == ND_BUS_ERROR;
 	return nd_bus_access(bus, nCyclesMainCounter, regs.instruction_pc, addr, 16,
 	                     ND_BUS_LINE | (write ? ND_BUS_WRITE : 0)) == ND_BUS_ERROR;
+}
+
+bool NextBusRust_AttachBoard(int slot, void* board, bool threaded) {
+	if (!bus || NextBus_TimingMode != NEXTBUS_TIMING_CYCLE || slot < 1 || slot > 15 ||
+	    !setting("PREVIOUS_NEXTBUS_DATA", 1))
+		return false;
+	nd_bus_local_config lc;
+	nd_bus_local_config_default(&lc);
+	lc.memory_waits = (uint32_t)setting("PREVIOUS_NEXTBUS_WAITS", 0);
+	if (!setting("PREVIOUS_NEXTBUS_BURSTS", 1))
+		lc.flags |= ND_SLOT_NO_BURSTS;
+	if (nd_bus_attach(bus, slot, (nd_board*)board, nCyclesMainCounter, &lc) != ND_OK) {
+		Log_Printf(LOG_ERROR, "[NextBus] slot %d: %s", slot, nd_last_error());
+		return false;
+	}
+	data_slot[slot] = true;
+	run_slot[slot] = !threaded;
+	Log_Printf(LOG_WARN, "[NextBus] slot %d: the Rust board's data goes through the model "
+	           "(%s), %u wait states", slot, threaded ? "threaded: timed by a stand-in" :
+	           "lockstep: the i860 gives up its bus", lc.memory_waits);
+	return true;
+}
+
+void NextBusRust_DetachBoard(int slot) {
+	if (slot < 1 || slot > 15 || !data_slot[slot])
+		return;
+	data_slot[slot] = run_slot[slot] = false;
+	if (bus)
+		nd_bus_detach(bus, slot);
+}
+
+bool NextBusRust_HasData(int slot) {
+	return slot >= 0 && slot < 16 && data_slot[slot];
+}
+
+bool NextBusRust_AdvancesBoard(int slot) {
+	return slot >= 0 && slot < 16 && run_slot[slot];
+}
+
+void NextBusRust_Advance(void) {
+	if (bus)
+		nd_bus_advance(bus, nCyclesMainCounter);
+}
+
+int NextBusRust_AccessData(uint32_t addr, int size, bool write, uint32_t* val) {
+	if (!bus)
+		return 2;
+	NextBusRust_Touched = true;
+	switch (nd_bus_access_data(bus, nCyclesMainCounter, regs.instruction_pc, addr, size,
+	                           write ? ND_BUS_WRITE : 0, val)) {
+	case ND_OK:        return 0;
+	case ND_BUS_ERROR: return 1;
+	default:           return 2;
+	}
 }
 
 void NextBusRust_Registers(uint32_t offset, int size, bool write) {
@@ -267,9 +336,27 @@ int NextBusRust_Access(uint32_t addr, int size, bool write) {
 	(void)addr; (void)size; (void)write;
 	return 0;
 }
-int NextBusRust_Line(uint32_t addr, bool write) {
-	(void)addr; (void)write;
+int NextBusRust_Line(uint32_t addr, bool write, uint32_t* data) {
+	(void)addr; (void)write; (void)data;
 	return 0;
+}
+bool NextBusRust_AttachBoard(int slot, void* board, bool threaded) {
+	(void)slot; (void)board; (void)threaded;
+	return false;
+}
+void NextBusRust_DetachBoard(int slot) { (void)slot; }
+bool NextBusRust_HasData(int slot) {
+	(void)slot;
+	return false;
+}
+bool NextBusRust_AdvancesBoard(int slot) {
+	(void)slot;
+	return false;
+}
+void NextBusRust_Advance(void) {}
+int NextBusRust_AccessData(uint32_t addr, int size, bool write, uint32_t* val) {
+	(void)addr; (void)size; (void)write; (void)val;
+	return 2;
 }
 void NextBusRust_Registers(uint32_t offset, int size, bool write) {
 	(void)offset; (void)size; (void)write;

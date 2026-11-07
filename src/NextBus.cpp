@@ -73,7 +73,8 @@ static inline bool bus_time(uaecptr addr, int slot, int size, bool write, uint32
         }
         return true;
     case NEXTBUS_TIMING_CYCLE:
-        if (!NextBusRust_InSpace(addr)) {
+        if (!NextBusRust_InSpace(addr) || NextBusRust_HasData(slot)) {
+            /* the board's accessors time its accesses with their data */
             return true;
         }
         if (NextBusRust_Access(addr, size, write)) {
@@ -262,7 +263,7 @@ extern "C" {
         }
         NextBusRust_Init();
         for (int slot = 1; slot < 16; slot++) {
-            if (nextbus[slot]->on_nextbus()) {
+            if (nextbus[slot]->on_nextbus() && !nextbus[slot]->attach_nextbus()) {
                 NextBusRust_Attach(slot);
             }
         }

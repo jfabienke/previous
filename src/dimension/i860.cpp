@@ -37,11 +37,19 @@ extern "C" {
      * board's NBIC asserts GINT*. A builtin board with a thread of its
      * own runs there. */
     void nd_run_boards(int nHostCycles) {
+        FOR_EACH_SLOT(slot) {
+            IF_ND_BOARD(slot, nd) {
+                nd->tick(nHostCycles);
+            }
+        }
+        nd_update_gint();
+    }
+
+    void nd_update_gint(void) {
         bool gint = false;
 
         FOR_EACH_SLOT(slot) {
             IF_ND_BOARD(slot, nd) {
-                nd->tick(nHostCycles);
                 gint |= nd->gint();
             }
         }

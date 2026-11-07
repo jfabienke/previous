@@ -372,8 +372,9 @@ static void Main_UnInit(void) {
 	Ethernet_UnInit();
 	IoMem_UnInit();
 	UI_UnInit();
-	Exit680x0();
+	/* before the boards go with the memory map: the telemetry has theirs */
 	NextBusRust_Exit();
+	Exit680x0();
 
 	/* Close debug log file */
 	DebugUI_UnInit();
