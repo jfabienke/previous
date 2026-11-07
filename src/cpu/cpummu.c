@@ -37,7 +37,6 @@
 #include "cpummu.h"
 #include "debug.h"
 #include "log.h"
-#include "nextbus_timing.h"
 #include "nextbus_rust.h"
 
 #define MMUDUMP 1
@@ -1375,13 +1374,10 @@ void mmu_get_move16(uaecptr addr, uae_u32 *v, bool data, int size)
 		/* one line transfer; its four long words are then free */
 		if (NextBusRust_Line(addr, false, v))
 			hardware_exception2(addr, 0, true, false, sz_long);
-	} else {
-		NextBusTiming_BurstBegin();
 	}
 	for (int i = 0; i < 4; i++) {
 		v[i] = x_phys_get_long(addr + i * 4);
 	}
-	NextBusTiming_BurstEnd();
 }
 
 void mmu_put_move16(uaecptr addr, uae_u32 *val, bool data, int size)
@@ -1397,13 +1393,10 @@ void mmu_put_move16(uaecptr addr, uae_u32 *val, bool data, int size)
 	if (NextBus_TimingMode == NEXTBUS_TIMING_CYCLE && NextBusRust_InSpace(addr)) {
 		if (NextBusRust_Line(addr, true, val))
 			hardware_exception2(addr, val[0], false, false, sz_long);
-	} else {
-		NextBusTiming_BurstBegin();
 	}
 	for (int i = 0; i < 4; i++) {
 		x_phys_put_long(addr + i * 4, val[i]);
 	}
-	NextBusTiming_BurstEnd();
 }
 
 

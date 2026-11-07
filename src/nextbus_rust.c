@@ -16,10 +16,9 @@
   here. An empty slot's reads time out (about 20 us) and then bus-error;
   writes to it are posted and lost, as the NBIC does with store-and-forward.
 
-  Mode (PREVIOUS_NEXTBUS_TIMING, else bNextBusTiming): 0 off, 1 this model
-  (the default for a 68040 Cube built with the Rust board), 2 the interim
-  transaction model in nextbus_timing.c (the default otherwise: the Turbo's
-  and the 68030's glue are not modelled).
+  Mode (PREVIOUS_NEXTBUS_TIMING, else bNextBusTiming): 0 off, 1 this model.
+  Only a 68040 Cube built with the Rust board has it: the Turbo's and the
+  68030's glue are not modelled, and their NeXTbus is untimed.
 
   Settings for what NeXT's specifications leave open:
     PREVIOUS_NEXTBUS_LCLK     board LCLK in MHz (16.5)
@@ -70,24 +69,13 @@ static int setting(const char* name, int fallback) {
 
 /* The mode for this machine. */
 static int timing_mode(void) {
-	int dflt = NEXTBUS_TIMING_OFF;
-	if (ConfigureParams.System.bNextBusTiming) {
-		dflt = NEXTBUS_TIMING_INTERIM;
 #ifdef ENABLE_ND_RUST
-		if (ConfigureParams.System.nMachineType == NEXT_CUBE040 &&
-		    !ConfigureParams.System.bTurbo)
-			dflt = NEXTBUS_TIMING_CYCLE;
+	int mode = setting("PREVIOUS_NEXTBUS_TIMING", ConfigureParams.System.bNextBusTiming);
+	if (mode == NEXTBUS_TIMING_CYCLE &&
+	    ConfigureParams.System.nMachineType == NEXT_CUBE040 && !ConfigureParams.System.bTurbo)
+		return NEXTBUS_TIMING_CYCLE;
 #endif
-	}
-	int mode = setting("PREVIOUS_NEXTBUS_TIMING", dflt);
-	if (ConfigureParams.System.nMachineType == NEXT_STATION ||
-	    mode < NEXTBUS_TIMING_OFF || mode > NEXTBUS_TIMING_INTERIM)
-		mode = NEXTBUS_TIMING_OFF;
-#ifndef ENABLE_ND_RUST
-	if (mode == NEXTBUS_TIMING_CYCLE)
-		mode = NEXTBUS_TIMING_INTERIM;
-#endif
-	return mode;
+	return NEXTBUS_TIMING_OFF;
 }
 
 #ifdef ENABLE_ND_RUST
@@ -116,8 +104,7 @@ void NextBusRust_Init(void) {
 	bus = nd_bus_create(&c);
 	if (!bus) {
 		Log_Printf(LOG_ERROR, "[NextBus] no timing model: %s", nd_last_error());
-		if (NextBus_TimingMode == NEXTBUS_TIMING_CYCLE)
-			NextBus_TimingMode = NEXTBUS_TIMING_INTERIM;
+		NextBus_TimingMode = NEXTBUS_TIMING_OFF;
 		return;
 	}
 
@@ -167,8 +154,8 @@ void NextBusRust_Reset(void) {
 	NextBusRust_Touched = false;
 	if (bus)
 		nd_bus_reset(bus);
-	if (!bus && NextBus_TimingMode == NEXTBUS_TIMING_CYCLE)
-		NextBus_TimingMode = NEXTBUS_TIMING_INTERIM;
+	if (!bus)
+		NextBus_TimingMode = NEXTBUS_TIMING_OFF;
 }
 
 void NextBusRust_Exit(void) {
@@ -315,13 +302,6 @@ int NextBusRust_RegWrite(bool slot_space, uint32_t offset, int size, uint32_t va
 	return nd_bus_reg_write(bus, slot_space ? ND_SLOT_SPACE : ND_BUS_NCS, offset, size, val) != ND_OK;
 }
 
-bool NextBusRust_StoreForward(void) {
-	uint32_t control = 0;
-	if (!bus || nd_bus_reg_read(bus, ND_BUS_NCS, 0, 4, &control) != ND_OK)
-		return true;
-	return (control & 0x08000000) != 0; /* STFWD */
-}
-
 #else /* !ENABLE_ND_RUST */
 
 void NextBusRust_Init(void) {
@@ -376,8 +356,4 @@ int NextBusRust_RegWrite(bool slot_space, uint32_t offset, int size, uint32_t va
 	(void)slot_space; (void)offset; (void)size; (void)val;
 	return 1;
 }
-bool NextBusRust_StoreForward(void) {
-	return true;
-}
-
 #endif /* ENABLE_ND_RUST */

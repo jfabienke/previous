@@ -10,7 +10,6 @@
 #include "NextBus.hpp"
 #include "nbic.h"
 #include "dimension.hpp"
-#include "nextbus_timing.h"
 #include "nextbus_rust.h"
 #ifdef ENABLE_ND_RUST
 #include "nd_rust.hpp"
@@ -67,11 +66,6 @@ public:
  * raises it here, and a write to an empty slot is posted and lost. */
 static inline bool bus_time(uaecptr addr, int slot, int size, bool write, uint32_t val) {
     switch (NextBus_TimingMode) {
-    case NEXTBUS_TIMING_INTERIM:
-        if (nextbus[slot]->on_nextbus()) {
-            NextBusTiming_Access(slot, size, write);
-        }
-        return true;
     case NEXTBUS_TIMING_CYCLE:
         if (!NextBusRust_InSpace(addr) || NextBusRust_HasData(slot)) {
             /* the board's accessors time its accesses with their data */
@@ -267,7 +261,6 @@ extern "C" {
                 NextBusRust_Attach(slot);
             }
         }
-        NextBusTiming_Reset();
     }
     
     void nextbus_uninit(void) {
@@ -280,7 +273,6 @@ extern "C" {
         for(int slot = 0; slot < 16; slot++)
             nextbus[slot]->reset();
         NextBusRust_Reset();
-        NextBusTiming_Reset();
     }
     
     void NextBus_Pause(bool pause) {

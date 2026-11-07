@@ -22,7 +22,6 @@ extern "C" {
 /* How the NeXTbus is timed: PREVIOUS_NEXTBUS_TIMING, or bNextBusTiming */
 #define NEXTBUS_TIMING_OFF     0 /* not at all */
 #define NEXTBUS_TIMING_CYCLE   1 /* cycle by cycle (next-bus, through nd-ffi) */
-#define NEXTBUS_TIMING_INTERIM 2 /* the transaction model in nextbus_timing.c */
 extern int NextBus_TimingMode;
 
 /* The instruction running made an access the model timed. */
@@ -72,8 +71,6 @@ extern uint32_t NextBusRust_EndInstruction(uint32_t cycles);
 extern bool NextBusRust_Registers_Available(void);
 extern int NextBusRust_RegRead(bool slot_space, uint32_t offset, int size, uint32_t *val);
 extern int NextBusRust_RegWrite(bool slot_space, uint32_t offset, int size, uint32_t val);
-/* The CPU board NBIC's STFWD. */
-extern bool NextBusRust_StoreForward(void);
 
 #ifdef __cplusplus
 }

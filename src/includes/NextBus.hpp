@@ -73,7 +73,7 @@ public:
     virtual void   pause(bool pause);
 
     /* Whether accesses to the slot are NeXTbus transactions (a board in
-     * another slot), which the CPU waits for (nextbus_timing.c) */
+     * another slot), which the CPU waits for (nextbus_rust.c) */
     virtual bool   on_nextbus(void) { return false; }
     /* Attach the board to the NeXTbus model with its data; false if it
      * moves its own data (then it is timed by a stand-in). */

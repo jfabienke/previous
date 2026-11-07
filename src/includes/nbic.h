@@ -14,8 +14,6 @@
 extern "C" {
 #endif /* __cplusplus */
 
-bool nbic_store_forward(void);
-
 uae_u32 nbic_reg_lget(uaecptr addr);
 uae_u32 nbic_reg_wget(uaecptr addr);
 uae_u32 nbic_reg_bget(uaecptr addr);
